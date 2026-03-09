@@ -2,6 +2,9 @@ require('dotenv').config()
 
 const AgentManager = require('./core/AgentManager')
 const EventBus = require('./core/EventBus')
+const ModelRegistry = require('./core/ModelRegistry')
+const DataCollector = require('./core/DataCollector')
+const SqliteStore = require('./data/storage/SqliteStore')
 const GcAdapter = require('./adapters/gc/GcAdapter')
 const gcConfig = require('./adapters/gc/config')
 const { createLogger } = require('./utils/logger')
@@ -12,6 +15,14 @@ async function main() {
   log.info('appback-ai-agent starting...')
 
   const eventBus = new EventBus()
+  const modelDir = process.env.MODEL_DIR || './models'
+  const dataDir = process.env.DATA_DIR || './data'
+
+  // Data layer
+  const store = new SqliteStore(dataDir)
+  const dataCollector = new DataCollector(store)
+  const modelRegistry = new ModelRegistry(modelDir)
+
   const config = {
     discoveryIntervalSec: parseInt(process.env.GAME_DISCOVERY_INTERVAL_SEC || '30'),
   }
@@ -21,8 +32,8 @@ async function main() {
   // Register gc adapter
   const gc = new GcAdapter({
     config: gcConfig,
-    modelRegistry: null,  // Phase 2
-    dataCollector: null,   // Phase 2
+    modelRegistry,
+    dataCollector,
     eventBus,
   })
   manager.registerAdapter(gc)
@@ -31,6 +42,7 @@ async function main() {
   const shutdown = async () => {
     log.info('Shutting down...')
     await manager.stop()
+    store.close()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)
