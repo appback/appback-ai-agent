@@ -1,0 +1,8 @@
+node_modules/
+.env
+data/*.db
+models/gc/*.onnx
+models/archive/
+training/data/raw/
+training/data/processed/
+*.log
