@@ -3,6 +3,7 @@ const GcApiClient = require('./GcApiClient')
 const GcSocketClient = require('./GcSocketClient')
 const GcStrategyEngine = require('./GcStrategyEngine')
 const GcFeatureBuilder = require('./GcFeatureBuilder')
+const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
 const log = createLogger('gc-adapter')
 
@@ -13,8 +14,11 @@ class GcAdapter extends BaseGameAdapter {
     this.ws = new GcSocketClient(this.config)
     this.strategyEngine = new GcStrategyEngine()
     this.featureBuilder = new GcFeatureBuilder()
+    this.equipmentManager = new GcEquipmentManager(this.dataCollector?.store)
+    this.metrics = opts.metrics || null
     this.activeGameId = null
     this.mySlot = null
+    this.currentLoadout = null
     this.gamePhase = null
     this.lastTickNum = -1
     this.sessionId = null
@@ -71,10 +75,12 @@ class GcAdapter extends BaseGameAdapter {
       )
     }
 
-    // Load equipment for feature builder
+    // Load equipment for feature builder + equipment manager
     try {
       const equip = await this.api.getEquipment()
       this.featureBuilder.setEquipment(equip)
+      this.equipmentManager.setCatalog(equip)
+      this.equipmentManager.loadStats()
       log.info('Equipment catalog loaded')
     } catch (err) {
       log.warn('Equipment load failed, using defaults', err.message)
@@ -113,11 +119,9 @@ class GcAdapter extends BaseGameAdapter {
 
   async joinGame() {
     try {
-      const result = await this.api.submitChallenge({
-        weapon: this.config.defaultWeapon,
-        armor: this.config.defaultArmor,
-        tier: this.config.defaultTier,
-      })
+      // Select optimal loadout based on historical performance
+      this.currentLoadout = this.equipmentManager.selectLoadout()
+      const result = await this.api.submitChallenge(this.currentLoadout)
 
       log.info(`Challenge result: ${result.status}`, result)
 
@@ -248,6 +252,18 @@ class GcAdapter extends BaseGameAdapter {
       }
     }
 
+    // Track metrics
+    if (this.metrics && myResult) {
+      this.metrics.record(myResult)
+    }
+
+    // Track equipment performance
+    if (this.currentLoadout && myResult) {
+      this.equipmentManager.recordResult(
+        this.currentLoadout.weapon, this.currentLoadout.armor, myResult
+      )
+    }
+
     // End data collection session
     if (this.dataCollector && this.sessionId) {
       this.dataCollector.endSession(this.sessionId, myResult, this._strategyLog)
@@ -260,6 +276,7 @@ class GcAdapter extends BaseGameAdapter {
     this.ws.leaveGame(gameId)
     this.activeGameId = null
     this.mySlot = null
+    this.currentLoadout = null
     this.gamePhase = null
     this.lastTickNum = -1
     this.sessionId = null
