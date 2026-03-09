@@ -4,6 +4,8 @@ const AgentManager = require('./core/AgentManager')
 const EventBus = require('./core/EventBus')
 const ModelRegistry = require('./core/ModelRegistry')
 const DataCollector = require('./core/DataCollector')
+const TrainingRunner = require('./core/TrainingRunner')
+const TrainingExporter = require('./data/exporters/TrainingExporter')
 const SqliteStore = require('./data/storage/SqliteStore')
 const GcAdapter = require('./adapters/gc/GcAdapter')
 const gcConfig = require('./adapters/gc/config')
@@ -17,11 +19,18 @@ async function main() {
   const eventBus = new EventBus()
   const modelDir = process.env.MODEL_DIR || './models'
   const dataDir = process.env.DATA_DIR || './data'
+  const autoTrainAfter = parseInt(process.env.AUTO_TRAIN_AFTER_GAMES || '50')
 
   // Data layer
   const store = new SqliteStore(dataDir)
   const dataCollector = new DataCollector(store)
   const modelRegistry = new ModelRegistry(modelDir)
+  const exporter = new TrainingExporter(store)
+  const trainer = new TrainingRunner({
+    dataDir: './training/data/raw',
+    outputDir: `${modelDir}/gc`,
+    autoTrainAfterGames: autoTrainAfter,
+  })
 
   const config = {
     discoveryIntervalSec: parseInt(process.env.GAME_DISCOVERY_INTERVAL_SEC || '30'),
@@ -51,12 +60,33 @@ async function main() {
   // Start
   await manager.start()
 
-  // Log game events
+  // Event handlers
   eventBus.on('game_found', ({ game, gameId }) => {
     log.info(`Game found: ${game} / ${gameId}`)
   })
-  eventBus.on('game_ended', ({ game, gameId }) => {
+
+  // Auto-training pipeline after games
+  eventBus.on('game_ended', async ({ game, gameId }) => {
     log.info(`Game completed: ${game} / ${gameId}`)
+
+    const totalGames = dataCollector.getSessionCount(game)
+
+    // Check if we should trigger training
+    if (totalGames > 0 && totalGames % autoTrainAfter === 0 && !trainer.isRunning) {
+      log.info(`Auto-train threshold reached (${totalGames} games), starting pipeline...`)
+
+      // Export data
+      const result = exporter.exportForTraining(game)
+      if (result) {
+        // Run training (async, non-blocking)
+        trainer.run(game).then(success => {
+          if (success) {
+            // ModelRegistry hot-reload will pick up the new model via fs.watch
+            log.info('New model will be loaded automatically via hot-reload')
+          }
+        })
+      }
+    }
   })
 }
 
