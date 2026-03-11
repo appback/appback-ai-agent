@@ -1,7 +1,7 @@
 """
 GC Strategy Network - Predicts optimal strategy from game state features.
 
-Input: 120-dim move feature vector (same as featureBuilder)
+Input: 162-dim move feature vector (same as featureBuilder v6.0)
 Output: 7 classes (3 modes × 2 target priorities + 1 flee flag)
 
 Simplified output mapping:
@@ -19,7 +19,7 @@ import torch.nn as nn
 
 
 class GcStrategyNet(nn.Module):
-    def __init__(self, input_dim=120, hidden1=64, hidden2=32, output_dim=7):
+    def __init__(self, input_dim=162, hidden1=64, hidden2=32, output_dim=7):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden1),

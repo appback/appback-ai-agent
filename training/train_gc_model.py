@@ -72,7 +72,7 @@ def build_labels(sessions, ticks_df):
         f_cols = [c for c in ticks_df.columns if c.startswith("f")]
         features = row[f_cols].values.astype(np.float32)
 
-        if len(features) != 120:
+        if len(features) != 162:
             continue
 
         # Determine strategy label from features
@@ -128,7 +128,7 @@ def train(X, y, w, epochs=50, batch_size=64, lr=0.001):
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size)
 
-    model = GcStrategyNet(input_dim=120, output_dim=7)
+    model = GcStrategyNet(input_dim=162, output_dim=7)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss(reduction="none")
 
@@ -178,7 +178,7 @@ def export_onnx(model, output_dir, val_acc):
     onnx_path = os.path.join(output_dir, "gc_strategy_model.onnx")
 
     model.eval()
-    dummy = torch.randn(1, 120)
+    dummy = torch.randn(1, 162)
     torch.onnx.export(
         model, dummy, onnx_path,
         input_names=["input"],
@@ -192,7 +192,7 @@ def export_onnx(model, output_dir, val_acc):
     meta = {
         "version": 1,
         "model": "gc_strategy_net",
-        "input_dim": 120,
+        "input_dim": 162,
         "output_dim": 7,
         "val_accuracy": round(val_acc, 4),
         "strategy_map": STRATEGY_MAP,

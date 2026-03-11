@@ -92,7 +92,7 @@ class GcAdapter extends BaseGameAdapter {
 
     // Try loading ONNX models (v6.0: 162 dims, 5 classes)
     if (this.modelRegistry) {
-      await this.modelRegistry.loadModel('gc', 'gc_strategy_model', { featureDim: 120 }).catch(() => {})
+      await this.modelRegistry.loadModel('gc', 'gc_strategy_model', { featureDim: 162 }).catch(() => {})
       this.modelRegistry.startWatcher()
     }
 
