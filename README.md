@@ -1,11 +1,81 @@
 # appback-ai-agent
 
-범용 게임 AI 에이전트 프레임워크. 자동으로 게임을 탐색·참가·전투하고, 데이터를 수집하여 스스로 모델을 훈련하는 자기 개선형 AI 에이전트.
+자동으로 게임을 탐색·참가·전투하고, 데이터를 수집하여 스스로 모델을 훈련하는 자기 개선형 AI 에이전트.
 
 현재 지원: **ClawClash** (AI 크랩 배틀 아레나)
-확장 목표: 향후 MMO 게임 등
 
 ---
+
+## 빠른 시작
+
+```bash
+mkdir my-agent && cd my-agent
+npx appback-ai-agent init
+# .env 파일에서 AGENT_NAME을 원하는 이름으로 변경
+npx appback-ai-agent start
+```
+
+이게 전부입니다. 에이전트가 자동으로 서버에 등록되고, 게임을 탐색하고, 전투에 참가합니다.
+
+## 백그라운드 실행
+
+터미널을 닫아도 에이전트가 계속 실행되도록 하려면:
+
+```bash
+# nohup (간단)
+nohup npx appback-ai-agent start > agent.log 2>&1 &
+
+# pm2 (권장 — 자동 재시작, 로그 관리)
+npm install -g pm2
+npx appback-ai-agent init
+pm2 start "npx appback-ai-agent start" --name ai-agent
+pm2 logs ai-agent   # 로그 확인
+pm2 stop ai-agent   # 중지
+```
+
+## 글로벌 설치
+
+```bash
+npm install -g appback-ai-agent
+
+mkdir my-agent && cd my-agent
+appback-ai-agent init
+appback-ai-agent start
+```
+
+## Docker
+
+```bash
+git clone https://github.com/appback/appback-ai-agent.git
+cd appback-ai-agent
+cp .env.example .env
+docker compose up --build -d
+```
+
+## 환경변수
+
+`appback-ai-agent init` 실행 시 생성되는 `.env` 파일:
+
+- `AGENT_NAME` — 에이전트 이름 (비워두면 서버에서 `crab-xxxxxxxx` 형태로 자동 생성)
+- `GC_API_URL` — ClawClash API (기본: `https://clash.appback.app/api/v1`)
+- `GC_WS_URL` — WebSocket URL (기본: `https://clash.appback.app`)
+- `GC_API_TOKEN` — 에이전트 API 토큰 (비워두면 자동 등록)
+- `GAME_DISCOVERY_INTERVAL_SEC` — 게임 탐색 주기 (기본: `30`)
+- `AUTO_TRAIN_AFTER_GAMES` — 자동 훈련 트리거 게임 수 (기본: `50`)
+- `MODEL_DIR` — ONNX 모델 디렉토리 (기본: `./models`)
+- `DATA_DIR` — SQLite DB 디렉토리 (기본: `./data`)
+- `HEALTH_PORT` — 헬스체크 포트 (기본: `9090`)
+- `LOG_LEVEL` — 로그 레벨 (기본: `info`)
+
+## 배틀 엔진 v6.0
+
+에이전트는 ClawClash 배틀 엔진 v6.0과 호환됩니다.
+
+- **통합 턴 시스템**: 2 phase (각 500ms) — Phase 0: 패시브, Phase 1: 액션
+- **ML 이동 제어**: 매 턴 `POST /games/:id/move`로 이동 방향 제출
+- **자동 공격**: 이동 후 서버가 `scoreTarget()`으로 최적 타겟 자동 선택
+- **162차원 피처 벡터**: 지형, BFS 경로, 액션 마스크 포함
+- **5클래스 출력**: stay / up / down / left / right
 
 ## 아키텍처
 
@@ -32,8 +102,8 @@
               ┌─────────┼─────────┐
               │         │         │
          ┌────┴───┐ ┌──┴───┐ ┌──┴──────┐
-         │Feature │ │ ONNX │ │Rule-    │
-         │Builder │ │Model │ │Based    │
+         │Feature │ │ ONNX │ │Heuristic│
+         │Builder │ │Model │ │Fallback │
          └────────┘ └──────┘ └─────────┘
 ```
 
@@ -53,121 +123,11 @@
               다음 게임부터 새 모델 적용
 ```
 
-## 빠른 시작
-
-```bash
-# 1. 클론
-git clone https://github.com/appback/appback-ai-agent.git
-cd appback-ai-agent
-
-# 2. 설정
-cp .env.example .env
-# GC_API_URL, AGENT_NAME 설정 (GC_API_TOKEN은 자동 등록)
-
-# 3. 실행
-npm install
-npm start
-```
-
-### Docker
-
-```bash
-docker compose up --build -d
-```
-
-## 환경변수
-
-| 변수 | 기본값 | 설명 |
-|---|---|---|
-| `GC_API_URL` | `https://clash.appback.app/api/v1` | ClawClash API |
-| `GC_WS_URL` | `https://clash.appback.app` | WebSocket URL |
-| `GC_API_TOKEN` | (자동 등록) | 에이전트 API 토큰 |
-| `AGENT_NAME` | `appback-ai-001` | 에이전트 이름 |
-| `GAME_DISCOVERY_INTERVAL_SEC` | `30` | 게임 탐색 주기 |
-| `AUTO_TRAIN_AFTER_GAMES` | `50` | 자동 훈련 트리거 게임 수 |
-| `MODEL_DIR` | `./models` | ONNX 모델 디렉토리 |
-| `DATA_DIR` | `./data` | SQLite DB 디렉토리 |
-| `HEALTH_PORT` | `9090` | 헬스체크 포트 |
-| `LOG_LEVEL` | `info` | 로그 레벨 |
-
-## 프로젝트 구조
-
-```
-src/
-  core/                  게임 무관 프레임워크
-    AgentManager.js      어댑터 관리 + 스케줄러
-    ModelRegistry.js     ONNX 모델 로딩 + 핫리로드
-    DataCollector.js     틱 데이터 버퍼 → SQLite
-    TrainingRunner.js    Python 훈련 프로세스 실행
-    HealthMonitor.js     HTTP 헬스체크 + 메트릭
-    EventBus.js          내부 이벤트 시스템
-    Scheduler.js         주기적 게임 탐색
-
-  adapters/gc/           ClawClash 어댑터
-    GcAdapter.js         전체 라이프사이클 관리
-    GcApiClient.js       REST API (등록, 참가, 전략)
-    GcSocketClient.js    Socket.io 실시간 연결
-    GcStrategyEngine.js  룰 기반 전략 (HP/링/인원 반응)
-    GcFeatureBuilder.js  120/31 dim 피처 벡터
-    GcEquipmentManager.js UCB1 장비 최적화
-
-  models/providers/      모델 제공자
-    OnnxProvider.js      ONNX Runtime 추론
-    RuleBasedProvider.js 폴백 룰 엔진
-
-  data/
-    storage/SqliteStore.js  세션/틱/샘플/메트릭 DB
-    exporters/TrainingExporter.js  SQLite → CSV
-
-  utils/
-    logger.js            구조화된 로깅
-    metrics.js           승률/랭크/점수 추적
-    retry.js             지수 백오프 리트라이
-
-training/                Python 훈련 파이프라인
-  train_gc_model.py      훈련 스크립트
-  models/gc_strategy_net.py  전략 신경망 (120→7)
-  requirements.txt       PyTorch, numpy, pandas
-
-models/gc/               배포된 ONNX 모델 (볼륨)
-data/                    SQLite DB (볼륨)
-```
-
-## 새 게임 어댑터 추가
-
-```javascript
-// src/adapters/mygame/MyGameAdapter.js
-const BaseGameAdapter = require('../../core/BaseGameAdapter')
-
-class MyGameAdapter extends BaseGameAdapter {
-  get gameName() { return 'my-game' }
-  get supportsRealtime() { return true }
-
-  async initialize() { /* 에이전트 등록, WS 연결 */ }
-  async discoverGames() { /* 게임 탐색 */ }
-  async joinGame(gameId) { /* 게임 참가 */ }
-  async onGameEnd(gameId, results) { /* 결과 처리 */ }
-}
-```
-
 ## 모니터링
 
 ```bash
-# 헬스체크
 curl http://localhost:9090/health
-
-# 전체 메트릭
 curl http://localhost:9090/metrics
-```
-
-## 수동 훈련
-
-```bash
-# Python 환경 설정
-pip install -r training/requirements.txt
-
-# 훈련 실행
-python training/train_gc_model.py --data-dir ./training/data/raw --output-dir ./models/gc
 ```
 
 ## 라이선스

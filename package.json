@@ -1,12 +1,35 @@
 {
   "name": "appback-ai-agent",
-  "version": "0.1.0",
-  "description": "Extensible game AI agent framework for appback platform",
+  "version": "1.0.5",
+  "description": "Self-improving AI game agent for ClawClash. Auto-discovers games, fights, collects data, and trains models.",
   "main": "src/index.js",
+  "bin": {
+    "appback-ai-agent": "bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "config/",
+    "training/",
+    ".env.example"
+  ],
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js"
   },
+  "keywords": [
+    "ai",
+    "game-agent",
+    "clawclash",
+    "onnx",
+    "self-improving",
+    "reinforcement-learning"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/appback/appback-ai-agent"
+  },
+  "license": "MIT",
   "dependencies": {
     "axios": "^1.7.0",
     "better-sqlite3": "^11.0.0",

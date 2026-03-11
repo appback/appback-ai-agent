@@ -59,6 +59,11 @@ class GcApiClient {
     const { data } = await this.client.get('/agents/me')
     return data
   }
+
+  async submitMove(gameId, direction) {
+    const { data } = await this.client.post(`/games/${gameId}/move`, { direction })
+    return data
+  }
 }
 
 module.exports = GcApiClient

@@ -1,5 +1,19 @@
-require('dotenv').config()
+// Global error handler — catch native module failures etc.
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err.message || err)
+  if (String(err.message).includes('better-sqlite3') || String(err.message).includes('better_sqlite3')) {
+    console.error('\n  better-sqlite3 failed to load.')
+    console.error('  On Windows, run: npm install --global windows-build-tools')
+    console.error('  Or install Visual Studio C++ Build Tools + Python 3.\n')
+  }
+  console.error(err.stack || err)
+  process.exit(1)
+})
 
+// CLI(bin/cli.js)에서 이미 로드한 경우 스킵
+if (!process.env._PKG_ROOT) require('dotenv').config()
+
+const path = require('path')
 const AgentManager = require('./core/AgentManager')
 const EventBus = require('./core/EventBus')
 const ModelRegistry = require('./core/ModelRegistry')
@@ -30,8 +44,10 @@ async function main() {
   const modelRegistry = new ModelRegistry(modelDir)
   const metrics = new Metrics(store)
   const exporter = new TrainingExporter(store)
+  const pkgRoot = process.env._PKG_ROOT || path.resolve(__dirname, '..')
+  const trainingDataDir = path.join(pkgRoot, 'training', 'data', 'raw')
   const trainer = new TrainingRunner({
-    dataDir: './training/data/raw',
+    dataDir: trainingDataDir,
     outputDir: `${modelDir}/gc`,
     autoTrainAfterGames: autoTrainAfter,
   })
@@ -101,5 +117,6 @@ async function main() {
 
 main().catch(err => {
   log.error('Fatal error', err.message)
+  console.error(err.stack || err)
   process.exit(1)
 })

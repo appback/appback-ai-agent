@@ -7,6 +7,9 @@ const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
 const log = createLogger('gc-adapter')
 
+// v6.0 action labels: model output index → direction
+const ACTION_LABELS = ['stay', 'up', 'down', 'left', 'right']
+
 class GcAdapter extends BaseGameAdapter {
   constructor(opts) {
     super(opts)
@@ -23,6 +26,7 @@ class GcAdapter extends BaseGameAdapter {
     this.lastTickNum = -1
     this.sessionId = null
     this._strategyLog = []
+    this._terrainCached = false
   }
 
   get gameName() { return 'claw-clash' }
@@ -86,10 +90,9 @@ class GcAdapter extends BaseGameAdapter {
       log.warn('Equipment load failed, using defaults', err.message)
     }
 
-    // Try loading ONNX models
+    // Try loading ONNX models (v6.0: 162 dims, 5 classes)
     if (this.modelRegistry) {
-      await this.modelRegistry.loadModel('gc', 'gc_move_model', { featureDim: 120 }).catch(() => {})
-      await this.modelRegistry.loadModel('gc', 'gc_attack_model', { featureDim: 31 }).catch(() => {})
+      await this.modelRegistry.loadModel('gc', 'gc_strategy_model', { featureDim: 120 }).catch(() => {})
       this.modelRegistry.startWatcher()
     }
 
@@ -130,6 +133,7 @@ class GcAdapter extends BaseGameAdapter {
         this.mySlot = result.slot
         this.strategyEngine.reset()
         this._strategyLog = []
+        this._terrainCached = false
         this.ws.joinGame(this.activeGameId)
 
         // Start data collection session
@@ -138,6 +142,9 @@ class GcAdapter extends BaseGameAdapter {
             this.gameName, this.activeGameId, this.mySlot
           )
         }
+
+        // Fetch full state to cache terrain
+        this._cacheTerrain()
 
         log.info(`Joined game ${this.activeGameId}, slot=${this.mySlot}`)
         return { status: 'joined', gameId: this.activeGameId }
@@ -155,6 +162,19 @@ class GcAdapter extends BaseGameAdapter {
     }
   }
 
+  async _cacheTerrain() {
+    try {
+      const state = await this.api.getGameState(this.activeGameId)
+      if (state?.arena) {
+        this.featureBuilder.setTerrain(state.arena)
+        this._terrainCached = true
+        log.info(`Terrain cached: ${this.featureBuilder.gridWidth}x${this.featureBuilder.gridHeight}`)
+      }
+    } catch (err) {
+      log.warn('Terrain cache failed, will retry on next tick', err.message)
+    }
+  }
+
   _onGameState(data) {
     if (!data) return
     const prevPhase = this.gamePhase
@@ -169,6 +189,7 @@ class GcAdapter extends BaseGameAdapter {
       this.mySlot = data.slot
       this.strategyEngine.reset()
       this._strategyLog = []
+      this._terrainCached = false
       this.ws.joinGame(this.activeGameId)
 
       if (this.dataCollector) {
@@ -177,6 +198,9 @@ class GcAdapter extends BaseGameAdapter {
         )
       }
 
+      // Cache terrain for the new game
+      this._cacheTerrain()
+
       log.info(`Assigned game from queue: ${this.activeGameId}, slot=${this.mySlot}`)
     }
   }
@@ -184,7 +208,12 @@ class GcAdapter extends BaseGameAdapter {
   _onTick(data) {
     if (!this.activeGameId || !data) return
 
-    const { tick, subTick, agents, shrinkPhase, powerups, events, eliminations } = data
+    const { tick, phase, agents, shrinkPhase, powerups, events, eliminations } = data
+
+    // Retry terrain cache if not yet loaded
+    if (!this._terrainCached && tick <= 3) {
+      this._cacheTerrain()
+    }
 
     const me = this.mySlot !== null
       ? agents?.find(a => a.slot === this.mySlot)
@@ -192,20 +221,33 @@ class GcAdapter extends BaseGameAdapter {
 
     if (!me) return
 
+    // Enrich agent data with equipment catalog
+    const enrichedMe = this.featureBuilder.enrichAgent(me)
+    const enrichedAgents = agents.map(a => this.featureBuilder.enrichAgent(a))
+
     // Build game state for feature builder
     const gameState = {
-      me, agents, shrinkPhase, tick, powerups,
-      gridWidth: 8, gridHeight: 8, maxTicks: 300,
+      me: enrichedMe,
+      agents: enrichedAgents,
+      shrinkPhase: shrinkPhase || 0,
+      tick,
+      powerups,
+      gridWidth: this.featureBuilder.gridWidth,
+      gridHeight: this.featureBuilder.gridHeight,
+      maxTicks: 300,
     }
 
-    // Build features for data collection (every sub-tick 0)
+    // Build features on phase 0 (passive phase)
     let moveFeatures = null
-    if (subTick === 0 && me.alive) {
+    if (phase === 0 && me.alive) {
       try {
-        moveFeatures = this.featureBuilder.buildMoveFeatures(me, gameState)
+        moveFeatures = this.featureBuilder.buildMoveFeatures(enrichedMe, gameState)
       } catch (err) {
         log.debug('Feature build failed', err.message)
       }
+
+      // Submit move decision
+      this._decideAndSubmitMove(enrichedMe, gameState, moveFeatures)
     }
 
     // Record tick data
@@ -216,14 +258,14 @@ class GcAdapter extends BaseGameAdapter {
       })), shrinkPhase, eliminations }
 
       this.dataCollector.recordTick(
-        this.sessionId, tick, subTick, tickState, moveFeatures, null
+        this.sessionId, tick, phase, tickState, moveFeatures, null
       )
     }
 
     if (!me.alive) return
 
-    // Strategy decision: sub-tick 0, every 10 ticks
-    if (subTick !== 0 || tick % this.config.strategyCooldownTicks !== 0) return
+    // Strategy decision: phase 0, every N ticks
+    if (phase !== 0 || tick % this.config.strategyCooldownTicks !== 0) return
     if (tick === this.lastTickNum) return
     this.lastTickNum = tick
 
@@ -235,6 +277,91 @@ class GcAdapter extends BaseGameAdapter {
         .then(res => log.debug(`Strategy submitted at tick ${tick}`, res))
         .catch(err => log.warn(`Strategy submit failed at tick ${tick}`, err.message))
     }
+  }
+
+  /**
+   * Decide move direction and submit to server.
+   * Priority: ONNX model → heuristic fallback
+   */
+  async _decideAndSubmitMove(me, gameState, features) {
+    if (!this.activeGameId || !me.alive) return
+
+    let direction = 'stay'
+
+    try {
+      // Try ONNX model inference
+      if (this.modelRegistry && features) {
+        const model = this.modelRegistry.getProvider('gc', 'gc_strategy_model')
+        if (model) {
+          const actionMask = this.featureBuilder.buildActionMask(me, gameState)
+          const logits = await model.infer(features)
+
+          // Apply action mask
+          const masked = logits.map((v, i) => actionMask[i] ? v : -Infinity)
+          const bestIdx = masked.indexOf(Math.max(...masked))
+          direction = ACTION_LABELS[bestIdx] || 'stay'
+
+          log.debug(`Model move: ${direction} (logits: [${masked.map(v => v.toFixed(2)).join(',')}])`)
+        }
+      }
+    } catch (err) {
+      log.debug('Model inference failed, using heuristic', err.message)
+    }
+
+    // Heuristic fallback if no model
+    if (direction === 'stay' && !this.modelRegistry?.getProvider('gc', 'gc_strategy_model')) {
+      direction = this._heuristicMove(me, gameState)
+    }
+
+    // Submit move to server
+    try {
+      await this.api.submitMove(this.activeGameId, direction)
+    } catch (err) {
+      log.debug(`Move submit failed: ${err.message}`)
+    }
+  }
+
+  /**
+   * Simple heuristic: move toward nearest enemy if no model available
+   */
+  _heuristicMove(me, gameState) {
+    const enemies = gameState.agents
+      .filter(a => a.alive && a.slot !== me.slot)
+      .sort((a, b) => (Math.abs(a.x - me.x) + Math.abs(a.y - me.y)) - (Math.abs(b.x - me.x) + Math.abs(b.y - me.y)))
+
+    if (!enemies.length) return 'stay'
+
+    const target = enemies[0]
+    const actionMask = this.featureBuilder.buildActionMask(me, gameState)
+
+    // Prefer moving toward target
+    const dx = target.x - me.x
+    const dy = target.y - me.y
+
+    // Direction preferences based on target position
+    const prefs = []
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      if (dx > 0) prefs.push(4) // right
+      else if (dx < 0) prefs.push(3) // left
+      if (dy > 0) prefs.push(2) // down
+      else if (dy < 0) prefs.push(1) // up
+    } else {
+      if (dy > 0) prefs.push(2) // down
+      else if (dy < 0) prefs.push(1) // up
+      if (dx > 0) prefs.push(4) // right
+      else if (dx < 0) prefs.push(3) // left
+    }
+
+    for (const idx of prefs) {
+      if (actionMask[idx]) return ACTION_LABELS[idx]
+    }
+
+    // Any valid move
+    for (let i = 1; i <= 4; i++) {
+      if (actionMask[i]) return ACTION_LABELS[i]
+    }
+
+    return 'stay'
   }
 
   _onBattleEnded(data) {
@@ -281,7 +408,9 @@ class GcAdapter extends BaseGameAdapter {
     this.lastTickNum = -1
     this.sessionId = null
     this._strategyLog = []
+    this._terrainCached = false
     this.strategyEngine.reset()
+    this.featureBuilder.clearTerrain()
 
     this.eventBus.emit('game_ended', { game: this.gameName, gameId, results })
     log.info('Ready for next game')
