@@ -90,7 +90,10 @@ class GcEquipmentManager {
     let bestLoadout = null
 
     for (const w of weapons) {
-      for (const a of armors) {
+      const allowedCategories = w.allowed_armors || ['heavy', 'light', 'cloth', 'none']
+      const compatibleArmors = armors.filter(a => allowedCategories.includes(a.category))
+
+      for (const a of compatibleArmors) {
         const key = `${w.slug}:${a.slug}`
         const stat = this._stats.get(key)
 
