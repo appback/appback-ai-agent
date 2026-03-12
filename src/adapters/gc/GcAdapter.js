@@ -168,21 +168,17 @@ class GcAdapter extends BaseGameAdapter {
     this._strategyLog = []
     this._terrainCached = false
 
-    // If slot not provided, get it from game state
+    // If slot not provided, resolve from game detail API
     if (slot != null) {
       this.mySlot = slot
     } else {
       try {
-        const state = await this.api.getGameState(gameId)
-        const me = state?.agents?.find(a => a.agent_id === this.agentId)
+        const game = await this.api.getGameDetail(gameId)
+        const me = game?.entries?.find(e => e.agent_id === this.agentId)
         this.mySlot = me?.slot ?? null
-        if (state?.arena) {
-          this.featureBuilder.setTerrain(state.arena)
-          this._terrainCached = true
-        }
-        log.info(`Resolved slot=${this.mySlot} from game state`)
+        log.info(`Resolved slot=${this.mySlot} from game detail`)
       } catch (err) {
-        log.warn('Could not resolve slot from game state', err.message)
+        log.warn('Could not resolve slot from game detail', err.message)
       }
     }
 
