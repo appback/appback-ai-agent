@@ -110,6 +110,21 @@ class GcAdapter extends BaseGameAdapter {
     }
 
     try {
+      // Check queue status first — we may already be assigned to a game
+      const queueStatus = await this.api.getQueueStatus().catch(() => null)
+      if (queueStatus?.active_game_id) {
+        log.info(`Found active game from queue: ${queueStatus.active_game_id}`)
+        await this._enterGame(queueStatus.active_game_id)
+        return { status: 'joined', gameId: queueStatus.active_game_id }
+      }
+
+      // If still in queue, wait for matchmaker
+      if (queueStatus?.in_queue) {
+        log.debug('Still in matchmaking queue, waiting...')
+        return { status: 'queued' }
+      }
+
+      // Not in queue, not in game — try to join
       const challenge = await this.api.getChallenge()
       if (challenge.status === 'busy') return { status: 'busy' }
       if (challenge.status === 'ready') return await this.joinGame()
@@ -129,29 +144,13 @@ class GcAdapter extends BaseGameAdapter {
       log.info(`Challenge result: ${result.status}`, result)
 
       if (result.status === 'joined' || result.status === 'updated') {
-        this.activeGameId = result.game_id
-        this.mySlot = result.slot
-        this.strategyEngine.reset()
-        this._strategyLog = []
-        this._terrainCached = false
-        this.ws.joinGame(this.activeGameId)
-
-        // Start data collection session
-        if (this.dataCollector) {
-          this.sessionId = this.dataCollector.startSession(
-            this.gameName, this.activeGameId, this.mySlot
-          )
-        }
-
-        // Fetch full state to cache terrain
-        this._cacheTerrain()
-
-        log.info(`Joined game ${this.activeGameId}, slot=${this.mySlot}`)
+        await this._enterGame(result.game_id, result.slot)
         return { status: 'joined', gameId: this.activeGameId }
       }
 
       if (result.status === 'queued') {
-        log.info('Queued for matchmaking')
+        log.info('Queued for matchmaking, will poll for assignment')
+        this._startQueuePolling()
         return { status: 'queued' }
       }
 
@@ -159,6 +158,74 @@ class GcAdapter extends BaseGameAdapter {
     } catch (err) {
       log.error('Join failed', err.message)
       return { status: 'error' }
+    }
+  }
+
+  async _enterGame(gameId, slot) {
+    this.activeGameId = gameId
+    this._stopQueuePolling()
+    this.strategyEngine.reset()
+    this._strategyLog = []
+    this._terrainCached = false
+
+    // If slot not provided, get it from game state
+    if (slot != null) {
+      this.mySlot = slot
+    } else {
+      try {
+        const state = await this.api.getGameState(gameId)
+        const me = state?.agents?.find(a => a.agent_id === this.agentId)
+        this.mySlot = me?.slot ?? null
+        if (state?.arena) {
+          this.featureBuilder.setTerrain(state.arena)
+          this._terrainCached = true
+        }
+        log.info(`Resolved slot=${this.mySlot} from game state`)
+      } catch (err) {
+        log.warn('Could not resolve slot from game state', err.message)
+      }
+    }
+
+    this.ws.joinGame(this.activeGameId)
+
+    // Start data collection session
+    if (this.dataCollector) {
+      this.sessionId = this.dataCollector.startSession(
+        this.gameName, this.activeGameId, this.mySlot
+      )
+    }
+
+    if (!this._terrainCached) this._cacheTerrain()
+
+    log.info(`Entered game ${this.activeGameId}, slot=${this.mySlot}`)
+  }
+
+  _startQueuePolling() {
+    if (this._queuePollTimer) return
+    log.info('Starting queue poll (every 5s)')
+    this._queuePollTimer = setInterval(() => this._pollQueue(), 5000)
+  }
+
+  _stopQueuePolling() {
+    if (this._queuePollTimer) {
+      clearInterval(this._queuePollTimer)
+      this._queuePollTimer = null
+    }
+  }
+
+  async _pollQueue() {
+    try {
+      const status = await this.api.getQueueStatus()
+      if (status.active_game_id && !this.activeGameId) {
+        log.info(`Game assigned from queue: ${status.active_game_id}`)
+        await this._enterGame(status.active_game_id)
+      }
+      if (!status.in_queue && !status.active_game_id) {
+        log.info('No longer in queue and no game assigned')
+        this._stopQueuePolling()
+      }
+    } catch (err) {
+      log.debug('Queue poll failed', err.message)
     }
   }
 
@@ -417,6 +484,7 @@ class GcAdapter extends BaseGameAdapter {
   }
 
   async shutdown() {
+    this._stopQueuePolling()
     if (this.activeGameId) this.ws.leaveGame(this.activeGameId)
     this.ws.disconnect()
     if (this.modelRegistry) this.modelRegistry.stopWatcher()

@@ -64,6 +64,11 @@ class GcApiClient {
     const { data } = await this.client.post(`/games/${gameId}/move`, { direction })
     return data
   }
+
+  async getQueueStatus() {
+    const { data } = await this.client.get('/queue/status')
+    return data
+  }
 }
 
 module.exports = GcApiClient
