@@ -101,6 +101,46 @@ class GcAdapter extends BaseGameAdapter {
     this.ws.onTick((data) => this._onTick(data))
     this.ws.onGameState((data) => this._onGameState(data))
     this.ws.onBattleEnded((data) => this._onBattleEnded(data))
+
+    // Handle reconnection: re-join room or recover from stale game
+    this.ws.onReconnect(() => this._onReconnect())
+  }
+
+  async _onReconnect() {
+    if (!this.activeGameId) return
+
+    log.info(`Reconnected — checking active game ${this.activeGameId}`)
+    try {
+      const game = await this.api.getGameDetail(this.activeGameId)
+      const state = game?.state
+
+      if (state === 'ended' || state === 'archived') {
+        log.info(`Game ${this.activeGameId} already ended (${state}), cleaning up`)
+        // Try to extract our result from game entries
+        const me = game?.entries?.find(e => e.agent_id === this.agentId)
+        const result = me ? {
+          rank: me.final_rank,
+          score: me.total_score,
+          kills: me.kills,
+          damage_dealt: me.damage_dealt,
+          damage_taken: me.damage_taken,
+          survived_ticks: me.survived_ticks,
+        } : null
+        await this.onGameEnd(this.activeGameId, result ? { rankings: [result] } : null)
+      } else {
+        // Game still active — re-join room
+        log.info(`Game ${this.activeGameId} still in ${state}, re-joining room`)
+        this.ws.joinGame(this.activeGameId)
+      }
+    } catch (err) {
+      log.warn(`Game check failed for ${this.activeGameId}, resetting`, err.message)
+      // Game likely doesn't exist anymore — clean up
+      this.ws.leaveGame(this.activeGameId)
+      this.activeGameId = null
+      this.mySlot = null
+      this.gamePhase = null
+      this.sessionId = null
+    }
   }
 
   async discoverGames() {

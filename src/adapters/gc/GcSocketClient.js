@@ -6,7 +6,7 @@ class GcSocketClient {
   constructor(config) {
     this.wsUrl = config.wsUrl
     this.socket = null
-    this._handlers = new Map()
+    this._onReconnectCallback = null
   }
 
   connect() {
@@ -22,6 +22,9 @@ class GcSocketClient {
 
     this.socket.on('connect', () => {
       log.info('WebSocket connected')
+      if (this._onReconnectCallback) {
+        this._onReconnectCallback()
+      }
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -31,6 +34,10 @@ class GcSocketClient {
     this.socket.on('connect_error', (err) => {
       log.error('WebSocket connection error', err.message)
     })
+  }
+
+  onReconnect(callback) {
+    this._onReconnectCallback = callback
   }
 
   joinGame(gameId) {
