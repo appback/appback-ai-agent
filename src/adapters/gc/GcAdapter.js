@@ -133,13 +133,9 @@ class GcAdapter extends BaseGameAdapter {
         this.ws.joinGame(this.activeGameId)
       }
     } catch (err) {
-      log.warn(`Game check failed for ${this.activeGameId}, resetting`, err.message)
-      // Game likely doesn't exist anymore — clean up
-      this.ws.leaveGame(this.activeGameId)
-      this.activeGameId = null
-      this.mySlot = null
-      this.gamePhase = null
-      this.sessionId = null
+      log.warn(`Game ${this.activeGameId} not found or server restarted, cleaning up`, err.message)
+      // Game doesn't exist anymore — full cleanup via onGameEnd
+      await this.onGameEnd(this.activeGameId, null)
     }
   }
 
