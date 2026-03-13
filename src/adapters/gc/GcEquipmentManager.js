@@ -34,7 +34,7 @@ class GcEquipmentManager {
       for (const s of sessions) {
         const result = JSON.parse(s.result || '{}')
         const stratLog = JSON.parse(s.strategy_log || '[]')
-        if (!result.placement) continue
+        if (!result.rank) continue
 
         // Extract loadout from first strategy entry or default
         const weapon = result.weapon || 'sword'
@@ -46,8 +46,8 @@ class GcEquipmentManager {
         }
         const stat = this._stats.get(key)
         stat.games++
-        if (result.placement === 1) stat.wins++
-        stat.totalRank += result.placement
+        if (result.rank === 1) stat.wins++
+        stat.totalRank += result.rank
         stat.totalScore += result.score || 0
       }
 
@@ -67,8 +67,8 @@ class GcEquipmentManager {
     }
     const stat = this._stats.get(key)
     stat.games++
-    if (result.placement === 1) stat.wins++
-    stat.totalRank += result.placement || 8
+    if (result.rank === 1) stat.wins++
+    stat.totalRank += result.rank || 8
     stat.totalScore += result.score || 0
   }
 

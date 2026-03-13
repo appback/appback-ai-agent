@@ -64,7 +64,7 @@ class TrainingExporter {
       const result = JSON.parse(t.game_result || '{}')
       const row = [t.session_id, t.tick, t.sub_tick]
       row.push(...features)
-      row.push(result.placement || 0, result.score || 0)
+      row.push(result.rank || 0, result.score || 0)
       lines.push(row.join(','))
     }
 

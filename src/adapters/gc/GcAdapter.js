@@ -438,7 +438,7 @@ class GcAdapter extends BaseGameAdapter {
     if (results?.rankings) {
       myResult = results.rankings.find(r => r.slot === this.mySlot)
       if (myResult) {
-        log.info(`Result: rank=${myResult.placement}, score=${myResult.score}, kills=${myResult.kills}`)
+        log.info(`Result: rank=${myResult.rank}, score=${myResult.score}, kills=${myResult.kills}`)
       }
     }
 

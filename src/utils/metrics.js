@@ -47,10 +47,10 @@ class Metrics {
   _record(result) {
     if (!result) return
     this._current.gamesPlayed++
-    if (result.placement === 1) this._current.wins++
-    if (result.placement <= 3) this._current.podiums++
+    if (result.rank === 1) this._current.wins++
+    if (result.rank <= 3) this._current.podiums++
     this._current.totalScore += result.score || 0
-    this._current.totalRank += result.placement || 8
+    this._current.totalRank += result.rank || 8
     this._current.kills += result.kills || 0
   }
 
