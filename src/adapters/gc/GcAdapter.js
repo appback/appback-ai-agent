@@ -268,7 +268,7 @@ class GcAdapter extends BaseGameAdapter {
     }
   }
 
-  _onTick(data) {
+  async _onTick(data) {
     if (!this.activeGameId || !data) return
 
     const { tick, phase, agents, shrinkPhase, powerups, events, eliminations } = data
@@ -300,8 +300,9 @@ class GcAdapter extends BaseGameAdapter {
       maxTicks: 300,
     }
 
-    // Build features on phase 0 (passive phase)
+    // Build features and decide move on phase 0 (passive phase)
     let moveFeatures = null
+    let decision = null
     if (phase === 0 && me.alive) {
       try {
         moveFeatures = this.featureBuilder.buildMoveFeatures(enrichedMe, gameState)
@@ -309,11 +310,11 @@ class GcAdapter extends BaseGameAdapter {
         log.debug('Feature build failed', err.message)
       }
 
-      // Submit move decision
-      this._decideAndSubmitMove(enrichedMe, gameState, moveFeatures)
+      // Submit move decision and capture result
+      decision = await this._decideAndSubmitMove(enrichedMe, gameState, moveFeatures)
     }
 
-    // Record tick data
+    // Record tick data with decision
     if (this.dataCollector && this.sessionId) {
       const tickState = { agents: agents.map(a => ({
         slot: a.slot, hp: a.hp, maxHp: a.maxHp, x: a.x, y: a.y,
@@ -321,7 +322,7 @@ class GcAdapter extends BaseGameAdapter {
       })), shrinkPhase, eliminations }
 
       this.dataCollector.recordTick(
-        this.sessionId, tick, phase, tickState, moveFeatures, null
+        this.sessionId, tick, phase, tickState, moveFeatures, decision
       )
     }
 
@@ -347,22 +348,26 @@ class GcAdapter extends BaseGameAdapter {
    * Priority: ONNX model → heuristic fallback
    */
   async _decideAndSubmitMove(me, gameState, features) {
-    if (!this.activeGameId || !me.alive) return
+    if (!this.activeGameId || !me.alive) return null
 
     let direction = 'stay'
+    let source = 'heuristic'
+    let logits = null
+    const actionMask = this.featureBuilder.buildActionMask(me, gameState)
 
     try {
       // Try ONNX model inference
       if (this.modelRegistry && features) {
         const model = this.modelRegistry.getProvider('gc', 'gc_strategy_model')
         if (model) {
-          const actionMask = this.featureBuilder.buildActionMask(me, gameState)
-          const logits = await model.infer(features)
+          const rawLogits = await model.infer(features)
+          logits = Array.from(rawLogits)
 
           // Apply action mask
           const masked = logits.map((v, i) => actionMask[i] ? v : -Infinity)
           const bestIdx = masked.indexOf(Math.max(...masked))
           direction = ACTION_LABELS[bestIdx] || 'stay'
+          source = 'model'
 
           log.debug(`Model move: ${direction} (logits: [${masked.map(v => v.toFixed(2)).join(',')}])`)
         }
@@ -372,7 +377,7 @@ class GcAdapter extends BaseGameAdapter {
     }
 
     // Heuristic fallback if no model
-    if (direction === 'stay' && !this.modelRegistry?.getProvider('gc', 'gc_strategy_model')) {
+    if (source !== 'model') {
       direction = this._heuristicMove(me, gameState)
     }
 
@@ -381,6 +386,13 @@ class GcAdapter extends BaseGameAdapter {
       await this.api.submitMove(this.activeGameId, direction)
     } catch (err) {
       log.debug(`Move submit failed: ${err.message}`)
+    }
+
+    return {
+      action: direction,
+      source,
+      logits,
+      actionMask: Array.from(actionMask),
     }
   }
 
