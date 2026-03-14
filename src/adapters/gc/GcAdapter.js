@@ -5,6 +5,7 @@ const GcStrategyEngine = require('./GcStrategyEngine')
 const GcFeatureBuilder = require('./GcFeatureBuilder')
 const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
+const { INACTIVE_STATES } = require('./constants')
 const log = createLogger('gc-adapter')
 
 // v6.0 action labels: model output index → direction
@@ -101,6 +102,7 @@ class GcAdapter extends BaseGameAdapter {
     this.ws.onTick((data) => this._onTick(data))
     this.ws.onGameState((data) => this._onGameState(data))
     this.ws.onBattleEnded((data) => this._onBattleEnded(data))
+    this.ws.onGameCancelled((data) => this._onGameCancelled(data))
 
     // Handle reconnection: re-join room or recover from stale game
     this.ws.onReconnect(() => this._onReconnect())
@@ -114,8 +116,8 @@ class GcAdapter extends BaseGameAdapter {
       const game = await this.api.getGameDetail(this.activeGameId)
       const state = game?.state
 
-      if (state === 'ended' || state === 'archived') {
-        log.info(`Game ${this.activeGameId} already ended (${state}), cleaning up`)
+      if (INACTIVE_STATES.includes(state)) {
+        log.info(`Game ${this.activeGameId} is inactive (${state}), cleaning up`)
         // Try to extract our result from game entries
         const me = game?.entries?.find(e => e.agent_id === this.agentId)
         const result = me ? {
@@ -141,8 +143,20 @@ class GcAdapter extends BaseGameAdapter {
 
   async discoverGames() {
     if (this.activeGameId) {
-      log.debug('Already in active game, skipping discovery')
-      return { status: 'busy' }
+      try {
+        const game = await this.api.getGameDetail(this.activeGameId)
+        const state = game?.state
+        if (INACTIVE_STATES.includes(state)) {
+          log.info(`Active game ${this.activeGameId} is ${state}, cleaning up stale state`)
+          await this.onGameEnd(this.activeGameId, null)
+        } else {
+          log.debug(`Active game ${this.activeGameId} in ${state}, skipping discovery`)
+          return { status: 'busy' }
+        }
+      } catch (err) {
+        log.warn(`Active game ${this.activeGameId} not found, cleaning up`, err.message)
+        await this.onGameEnd(this.activeGameId, null)
+      }
     }
 
     try {
@@ -479,6 +493,12 @@ class GcAdapter extends BaseGameAdapter {
     if (!this.activeGameId) return
     log.info('Battle ended', data)
     this.onGameEnd(this.activeGameId, data)
+  }
+
+  _onGameCancelled(data) {
+    if (!this.activeGameId) return
+    log.info(`Game cancelled: ${this.activeGameId}`, data)
+    this.onGameEnd(this.activeGameId, null)
   }
 
   async onGameEnd(gameId, results) {

@@ -64,6 +64,10 @@ class GcSocketClient {
     this.socket?.on('battle_ended', handler)
   }
 
+  onGameCancelled(handler) {
+    this.socket?.on('game_cancelled', handler)
+  }
+
   off(event, handler) {
     this.socket?.off(event, handler)
   }
