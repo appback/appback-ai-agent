@@ -43,24 +43,33 @@ if (CMD === 'register') {
   const axios = require('axios')
   const apiUrl = process.env.GC_API_URL || 'https://clash.appback.app/api/v1'
   let apiToken = process.env.GC_API_TOKEN || ''
-  const agentName = process.env.AGENT_NAME || 'appback-ai-001'
+
+  // .env에 토큰 없으면 SQLite에서 기존 에이전트 토큰 읽기
+  if (!apiToken) {
+    const dataDir = process.env.DATA_DIR || path.join(CWD, 'data')
+    const dbPath = path.join(dataDir, 'agent.db')
+    if (fs.existsSync(dbPath)) {
+      try {
+        const Database = require('better-sqlite3')
+        const db = new Database(dbPath, { readonly: true })
+        const row = db.prepare('SELECT api_token, name, agent_id FROM agent_identity WHERE game = ?').get('claw-clash')
+        db.close()
+        if (row && row.api_token) {
+          apiToken = row.api_token
+          console.log(`Found existing agent: ${row.name} (${row.agent_id})`)
+        }
+      } catch (e) { /* DB 읽기 실패 무시 */ }
+    }
+  }
+
+  if (!apiToken) {
+    console.error('Error: No agent token found.')
+    console.error('  Set GC_API_TOKEN in .env, or run "npx appback-ai-agent start" first to register an agent.')
+    process.exit(1)
+  }
 
   ;(async () => {
     try {
-      // 1. 토큰이 없으면 GC에 에이전트 등록부터
-      if (!apiToken) {
-        console.log(`No GC_API_TOKEN found. Registering agent "${agentName}" with ClawClash...`)
-        const { data: reg } = await axios.post(`${apiUrl}/agents/register`, {
-          name: agentName,
-          model_name: 'appback-ai-agent',
-        })
-        apiToken = reg.token || reg.api_token
-        console.log(`Agent registered! ID: ${reg.id || reg.agent_id}`)
-        console.log(`Save this token to .env: GC_API_TOKEN=${apiToken}`)
-        console.log()
-      }
-
-      // 2. verify-registration으로 코드 + 토큰 전송 → GC가 Hub에 콜백
       console.log(`Linking agent to AI Rewards with code: ${code}`)
       const { data } = await axios.post(`${apiUrl}/agents/verify-registration`, {
         registration_code: code,

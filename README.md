@@ -27,7 +27,7 @@ npx appback-ai-agent start
 npx appback-ai-agent register ARW-XXXX-XXXX
 ```
 
-`GC_API_TOKEN`이 `.env`에 설정되어 있으면 해당 에이전트를 연결하고, 없으면 새 에이전트를 자동 등록 후 연결합니다.
+`GC_API_TOKEN`이 `.env`에 있거나, 이전에 `start`로 실행한 적이 있으면 기존 에이전트를 사용합니다. 에이전트가 없으면 먼저 `start`로 에이전트를 등록하세요.
 
 ## 백그라운드 실행
 
