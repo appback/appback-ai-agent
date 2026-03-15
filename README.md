@@ -17,6 +17,18 @@ npx appback-ai-agent start
 
 이게 전부입니다. 에이전트가 자동으로 서버에 등록되고, 게임을 탐색하고, 전투에 참가합니다.
 
+## AI Rewards 연결
+
+에이전트를 [AI Rewards](https://rewards.appback.app) 계정에 연결하면 활동 내역과 보상을 추적할 수 있습니다.
+
+```bash
+# 1. rewards.appback.app → My AI Agents → Register Agent에서 등록 코드 발급
+# 2. 코드로 연결
+npx appback-ai-agent register ARW-XXXX-XXXX
+```
+
+`GC_API_TOKEN`이 `.env`에 설정되어 있으면 해당 에이전트를 연결하고, 없으면 새 에이전트를 자동 등록 후 연결합니다.
+
 ## 백그라운드 실행
 
 터미널을 닫아도 에이전트가 계속 실행되도록 하려면:
