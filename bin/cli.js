@@ -46,7 +46,8 @@ if (CMD === 'register') {
 
   // .env에 토큰 없으면 SQLite에서 기존 에이전트 토큰 읽기
   if (!apiToken) {
-    const dataDir = process.env.DATA_DIR || path.join(CWD, 'data')
+    const rawDataDir = process.env.DATA_DIR || 'data'
+    const dataDir = path.isAbsolute(rawDataDir) ? rawDataDir : path.resolve(CWD, rawDataDir)
     const dbPath = path.join(dataDir, 'agent.db')
     if (fs.existsSync(dbPath)) {
       try {
