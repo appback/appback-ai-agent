@@ -57,27 +57,15 @@ class GcAdapter extends BaseGameAdapter {
         const me = await this.api.getAgentMe()
         this.agentId = me.id
         log.info(`Agent: ${me.name} (${me.id})`)
-      } catch {
-        log.warn('Token invalid, will re-register')
-        this.apiToken = null
+      } catch (err) {
+        log.error(`Token validation failed: ${err.message}`)
+        throw new Error('Agent token validation failed. Check server status or re-register manually.')
       }
     }
 
-    // Register if needed
+    // No token available — cannot proceed
     if (!this.apiToken) {
-      const result = await this.api.register(this.config.agentName)
-      this.apiToken = result.token || result.api_token
-      this.agentId = result.id || result.agent_id
-      this.api.setToken(this.apiToken)
-      log.info(`Registered: ${this.config.agentName} → ${this.agentId}`)
-      log.warn('Save this token to GC_API_TOKEN env var!')
-    }
-
-    // Persist identity
-    if (this.dataCollector) {
-      this.dataCollector.store.saveIdentity(
-        this.gameName, this.agentId, this.apiToken, this.config.agentName
-      )
+      throw new Error('No agent token found. Run "npx appback-ai-agent init" to register.')
     }
 
     // Load equipment for feature builder + equipment manager
@@ -120,7 +108,7 @@ class GcAdapter extends BaseGameAdapter {
         log.info(`Game ${this.activeGameId} is inactive (${state}), cleaning up`)
         // Try to extract our result from game entries
         const me = game?.entries?.find(e => e.agent_id === this.agentId)
-        const result = me ? {
+        const result = me && me.final_rank ? {
           rank: me.final_rank,
           score: me.total_score,
           kills: me.kills,
@@ -128,7 +116,11 @@ class GcAdapter extends BaseGameAdapter {
           damage_taken: me.damage_taken,
           survived_ticks: me.survived_ticks,
         } : null
-        await this.onGameEnd(this.activeGameId, result ? { rankings: [result] } : null)
+        if (result) {
+          await this.onGameEnd(this.activeGameId, { rankings: [result] })
+        } else {
+          this._onGameCancelled({ reason: state })
+        }
       } else {
         // Game still active — re-join room
         log.info(`Game ${this.activeGameId} still in ${state}, re-joining room`)
@@ -136,8 +128,8 @@ class GcAdapter extends BaseGameAdapter {
       }
     } catch (err) {
       log.warn(`Game ${this.activeGameId} not found or server restarted, cleaning up`, err.message)
-      // Game doesn't exist anymore — full cleanup via onGameEnd
-      await this.onGameEnd(this.activeGameId, null)
+      // Game doesn't exist anymore — drop session and cleanup
+      this._onGameCancelled({ reason: 'not_found' })
     }
   }
 
@@ -148,14 +140,14 @@ class GcAdapter extends BaseGameAdapter {
         const state = game?.state
         if (INACTIVE_STATES.includes(state)) {
           log.info(`Active game ${this.activeGameId} is ${state}, cleaning up stale state`)
-          await this.onGameEnd(this.activeGameId, null)
+          this._onGameCancelled({ reason: state })
         } else {
           log.debug(`Active game ${this.activeGameId} in ${state}, skipping discovery`)
           return { status: 'busy' }
         }
       } catch (err) {
         log.warn(`Active game ${this.activeGameId} not found, cleaning up`, err.message)
-        await this.onGameEnd(this.activeGameId, null)
+        this._onGameCancelled({ reason: 'not_found' })
       }
     }
 

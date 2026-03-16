@@ -24,7 +24,7 @@ class Metrics {
     try {
       const sessions = this.store.db.prepare(`
         SELECT result FROM game_sessions
-        WHERE game = ? AND result IS NOT NULL
+        WHERE game = ? AND result IS NOT NULL AND result != 'null'
       `).all(game)
 
       for (const s of sessions) {

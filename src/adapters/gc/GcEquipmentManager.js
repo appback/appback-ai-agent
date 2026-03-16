@@ -28,7 +28,7 @@ class GcEquipmentManager {
     try {
       const sessions = this.store.db.prepare(`
         SELECT result, strategy_log FROM game_sessions
-        WHERE game = 'claw-clash' AND result IS NOT NULL
+        WHERE game = 'claw-clash' AND result IS NOT NULL AND result != 'null'
       `).all()
 
       for (const s of sessions) {
