@@ -40,6 +40,12 @@ class DataCollector {
     this._tickBuffer = []
   }
 
+  dropSession(sessionId) {
+    this._tickBuffer = []
+    this.store.dropSession(sessionId)
+    log.info(`Session dropped (cancelled): #${sessionId}`)
+  }
+
   getSessionCount(game) {
     return this.store.getSessionCount(game)
   }

@@ -11,7 +11,7 @@ class TrainingExporter {
 
   exportForTraining(game, minSessions = 10) {
     const sessions = this.store.db.prepare(`
-      SELECT * FROM game_sessions WHERE game = ? AND result IS NOT NULL ORDER BY id
+      SELECT * FROM game_sessions WHERE game = ? AND result IS NOT NULL AND result != 'null' ORDER BY id
     `).all(game)
 
     if (sessions.length < minSessions) {
@@ -41,7 +41,7 @@ class TrainingExporter {
       SELECT bt.*, gs.result as game_result, gs.my_slot
       FROM battle_ticks bt
       JOIN game_sessions gs ON gs.id = bt.session_id
-      WHERE gs.game = ? AND bt.my_features IS NOT NULL
+      WHERE gs.game = ? AND bt.my_features IS NOT NULL AND gs.result IS NOT NULL AND gs.result != 'null'
       ORDER BY bt.session_id, bt.tick, bt.sub_tick
     `)
 
@@ -61,7 +61,7 @@ class TrainingExporter {
     const lines = [header.join(',')]
     for (const t of ticks) {
       const features = JSON.parse(t.my_features)
-      const result = JSON.parse(t.game_result || '{}')
+      const result = JSON.parse(t.game_result || '{}') || {}
       const row = [t.session_id, t.tick, t.sub_tick]
       row.push(...features)
       row.push(result.rank || 0, result.score || 0)

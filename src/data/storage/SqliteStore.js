@@ -98,6 +98,11 @@ class SqliteStore {
     `).run(JSON.stringify(result), JSON.stringify(strategyLog), sessionId)
   }
 
+  dropSession(sessionId) {
+    this.db.prepare('DELETE FROM battle_ticks WHERE session_id = ?').run(sessionId)
+    this.db.prepare('DELETE FROM game_sessions WHERE id = ?').run(sessionId)
+  }
+
   // --- Battle Ticks ---
   recordTick(sessionId, tick, subTick, state, features, decision) {
     this.db.prepare(`

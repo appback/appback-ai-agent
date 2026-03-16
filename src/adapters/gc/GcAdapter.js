@@ -498,7 +498,27 @@ class GcAdapter extends BaseGameAdapter {
   _onGameCancelled(data) {
     if (!this.activeGameId) return
     log.info(`Game cancelled: ${this.activeGameId}`, data)
-    this.onGameEnd(this.activeGameId, null)
+
+    // Drop cancelled session data
+    if (this.dataCollector && this.sessionId) {
+      this.dataCollector.dropSession(this.sessionId)
+    }
+
+    // Cleanup
+    this.ws.leaveGame(this.activeGameId)
+    this.activeGameId = null
+    this.mySlot = null
+    this.currentLoadout = null
+    this.gamePhase = null
+    this.lastTickNum = -1
+    this.sessionId = null
+    this._strategyLog = []
+    this._terrainCached = false
+    this.strategyEngine.reset()
+    this.featureBuilder.clearTerrain()
+
+    this.eventBus.emit('game_cancelled', { game: this.gameName })
+    log.info('Ready for next game')
   }
 
   async onGameEnd(gameId, results) {
