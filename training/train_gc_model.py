@@ -55,14 +55,24 @@ def build_labels(sessions, ticks_df):
     labels_list = []
     weights_list = []
 
-    # Build session result lookup
+    # Build session result lookup — score-based reward
+    all_scores = []
     session_results = {}
     for s in sessions:
         if s.get("result"):
-            rank = s["result"].get("placement", 8)
             score = s["result"].get("score", 0)
-            reward = max(0.1, (9 - rank) / 8)  # 1.0 for rank 1, 0.125 for rank 8
-            session_results[s["id"]] = {"rank": rank, "score": score, "reward": reward}
+            all_scores.append(score)
+
+    min_score = min(all_scores) if all_scores else 0
+    max_score = max(all_scores) if all_scores else 1
+    score_range = max(max_score - min_score, 1)
+
+    for s in sessions:
+        if s.get("result"):
+            score = s["result"].get("score", 0)
+            # Normalize score to [0.1, 1.0] — higher score = better moves
+            reward = 0.1 + 0.9 * (score - min_score) / score_range
+            session_results[s["id"]] = {"score": score, "reward": reward}
 
     skipped_no_action = 0
 
