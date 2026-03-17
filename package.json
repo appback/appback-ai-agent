@@ -10,7 +10,9 @@
     "bin/",
     "src/",
     "config/",
-    "training/",
+    "training/*.py",
+    "training/*.txt",
+    "training/models/*.py",
     ".env.example"
   ],
   "scripts": {

@@ -1,0 +1,6 @@
+training/data/
+training/models/__pycache__/
+models/
+data/
+docs/
+*.db
