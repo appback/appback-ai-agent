@@ -41,7 +41,7 @@ class TrainingExporter {
       SELECT bt.*, gs.result as game_result, gs.my_slot
       FROM battle_ticks bt
       JOIN game_sessions gs ON gs.id = bt.session_id
-      WHERE gs.game = ? AND bt.my_features IS NOT NULL AND gs.result IS NOT NULL AND gs.result != 'null'
+      WHERE gs.game = ? AND bt.my_features IS NOT NULL AND bt.my_decision IS NOT NULL AND gs.result IS NOT NULL AND gs.result != 'null'
       ORDER BY bt.session_id, bt.tick, bt.sub_tick
     `)
 
