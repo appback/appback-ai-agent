@@ -184,7 +184,9 @@ def train(X, y, w, epochs=50, batch_size=64, lr=0.001):
 
 
 def export_onnx(model, output_dir, val_acc):
-    """Export trained model to ONNX format."""
+    """Export trained model to ONNX format (single file)."""
+    import onnx
+
     os.makedirs(output_dir, exist_ok=True)
     onnx_path = os.path.join(output_dir, "gc_move_model.onnx")
 
@@ -197,7 +199,17 @@ def export_onnx(model, output_dir, val_acc):
         dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
         opset_version=17,
     )
-    print(f"ONNX model exported: {onnx_path}")
+
+    # torch 2.10+ may split weights into .onnx.data — re-save as single file
+    data_path = onnx_path + ".data"
+    if os.path.exists(data_path):
+        m = onnx.load(onnx_path, load_external_data=True)
+        onnx.save(m, onnx_path)
+        if os.path.exists(data_path):
+            os.remove(data_path)
+        print(f"ONNX model re-saved as single file: {onnx_path}")
+    else:
+        print(f"ONNX model exported: {onnx_path}")
 
     # Save metadata
     meta = {

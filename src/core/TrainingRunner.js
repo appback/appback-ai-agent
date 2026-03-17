@@ -8,6 +8,7 @@ class TrainingRunner {
     this.dataDir = config.dataDir || './training/data/raw'
     this.outputDir = config.outputDir || './models/gc'
     this.autoTrainAfterGames = config.autoTrainAfterGames || 50
+    this.pythonPath = config.pythonPath || process.env.PYTHON_PATH || 'python3'
     this._running = false
   }
 
@@ -20,11 +21,11 @@ class TrainingRunner {
     }
 
     this._running = true
-    log.info(`Starting training for ${game}...`)
+    log.info(`Starting training for ${game} (python: ${this.pythonPath})...`)
 
     return new Promise((resolve) => {
       const scriptPath = path.join(__dirname, '..', '..', 'training', 'train_gc_model.py')
-      const proc = spawn('python3', [
+      const proc = spawn(this.pythonPath, [
         scriptPath,
         '--data-dir', this.dataDir,
         '--output-dir', this.outputDir,

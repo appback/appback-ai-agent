@@ -92,6 +92,64 @@ if (CMD === 'register') {
   return
 }
 
+// ── export: 학습 데이터 재추출 ──
+if (CMD === 'export') {
+  const envPath = path.join(CWD, '.env')
+  if (fs.existsSync(envPath)) require('dotenv').config({ path: envPath })
+  else require('dotenv').config()
+
+  const rawDataDir = process.env.DATA_DIR || 'data'
+  const dataDir = path.isAbsolute(rawDataDir) ? rawDataDir : path.resolve(CWD, rawDataDir)
+  process.env.DATA_DIR = dataDir
+
+  const SqliteStore = require(path.join(PKG_ROOT, 'src', 'data', 'storage', 'SqliteStore'))
+  const TrainingExporter = require(path.join(PKG_ROOT, 'src', 'data', 'exporters', 'TrainingExporter'))
+
+  const store = new SqliteStore(dataDir)
+  const exportDir = path.join(PKG_ROOT, 'training', 'data', 'raw')
+  const exporter = new TrainingExporter(store, exportDir)
+  const result = exporter.exportForTraining('claw-clash', 1)
+  store.close()
+
+  if (result && result.tickCount) {
+    console.log(`Exported ${result.sessionCount} sessions, ${result.tickCount} ticks → ${exportDir}`)
+  } else {
+    console.log('No data to export (need at least 1 completed game)')
+  }
+  process.exit(0)
+}
+
+// ── train: 수동 학습 실행 ──
+if (CMD === 'train') {
+  const envPath = path.join(CWD, '.env')
+  if (fs.existsSync(envPath)) require('dotenv').config({ path: envPath })
+  else require('dotenv').config()
+
+  const { spawn: spawnProc } = require('child_process')
+  const pythonPath = process.env.PYTHON_PATH || 'python3'
+  const scriptPath = path.join(PKG_ROOT, 'training', 'train_gc_model.py')
+  const dataDir = path.join(PKG_ROOT, 'training', 'data', 'raw')
+  const modelDir = process.env.MODEL_DIR || path.join(CWD, 'models')
+  const outputDir = path.join(modelDir, 'gc')
+
+  console.log(`Python: ${pythonPath}`)
+  console.log(`Data:   ${dataDir}`)
+  console.log(`Output: ${outputDir}`)
+  console.log()
+
+  const proc = spawnProc(pythonPath, [scriptPath, '--data-dir', dataDir, '--output-dir', outputDir], {
+    stdio: 'inherit',
+    env: { ...process.env, PYTHONPATH: path.join(PKG_ROOT, 'training') },
+  })
+  proc.on('close', (code) => process.exit(code || 0))
+  proc.on('error', (err) => {
+    console.error(`Failed to start python: ${err.message}`)
+    console.error(`Set PYTHON_PATH in .env to your venv python path`)
+    process.exit(1)
+  })
+  return
+}
+
 // ── start: 에이전트 실행 ──
 if (CMD === 'start' || !CMD) {
   // .env가 CWD에 있으면 로드
@@ -134,12 +192,24 @@ Usage:
   npx appback-ai-agent init                  Create .env and directories
   npx appback-ai-agent start                 Start the agent (default)
   npx appback-ai-agent register <code>       Link agent to AI Rewards account
+  npx appback-ai-agent export                Export training data from DB
+  npx appback-ai-agent train                 Run model training manually
   npx appback-ai-agent help                  Show this help
 
 Quick start:
   npx appback-ai-agent init
   # Edit .env → set AGENT_NAME
   npx appback-ai-agent start
+
+Training (requires Python):
+  pip install -r node_modules/appback-ai-agent/training/requirements.txt
+  npx appback-ai-agent export                # Export data from SQLite
+  npx appback-ai-agent train                 # Train model
+
+  # Ubuntu 24.04 (PEP 668):
+  python3 -m venv .venv && source .venv/bin/activate
+  pip install -r node_modules/appback-ai-agent/training/requirements.txt
+  echo 'PYTHON_PATH=.venv/bin/python3' >> .env
 
 AI Rewards registration:
   1. Go to https://rewards.appback.app → My AI Agents → Register Agent
