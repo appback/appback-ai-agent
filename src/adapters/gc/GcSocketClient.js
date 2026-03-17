@@ -7,6 +7,7 @@ class GcSocketClient {
     this.wsUrl = config.wsUrl
     this.socket = null
     this._onReconnectCallback = null
+    this._hasConnectedOnce = false
   }
 
   connect() {
@@ -21,9 +22,16 @@ class GcSocketClient {
     })
 
     this.socket.on('connect', () => {
-      log.info('WebSocket connected')
+      if (!this._hasConnectedOnce) {
+        this._hasConnectedOnce = true
+        log.info('WebSocket connected (initial)')
+        return
+      }
+      log.info('WebSocket reconnected')
       if (this._onReconnectCallback) {
-        this._onReconnectCallback()
+        Promise.resolve(this._onReconnectCallback()).catch(err => {
+          log.error('Reconnect callback failed', err.message)
+        })
       }
     })
 

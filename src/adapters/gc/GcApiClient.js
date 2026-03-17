@@ -1,4 +1,6 @@
 const axios = require('axios')
+const fs = require('fs')
+const FormData = require('form-data')
 const { createLogger } = require('../../utils/logger')
 const { retry } = require('../../utils/retry')
 const log = createLogger('gc-api')
@@ -72,6 +74,21 @@ class GcApiClient {
 
   async getGameDetail(gameId) {
     const { data } = await this.client.get(`/games/${gameId}`)
+    return data
+  }
+
+  async uploadModel(onnxPath) {
+    const form = new FormData()
+    form.append('model', fs.createReadStream(onnxPath))
+    const { data } = await this.client.post('/agents/me/model', form, {
+      headers: form.getHeaders(),
+      maxBodyLength: 2 * 1024 * 1024,
+    })
+    return data
+  }
+
+  async deleteModel() {
+    const { data } = await this.client.delete('/agents/me/model')
     return data
   }
 }

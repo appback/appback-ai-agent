@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "model": "gc_move_net",
+  "input_dim": 162,
+  "output_dim": 5,
+  "feature_version": "6.0",
+  "val_accuracy": 0.9827,
+  "action_labels": [
+    "stay",
+    "up",
+    "down",
+    "left",
+    "right"
+  ]
+}

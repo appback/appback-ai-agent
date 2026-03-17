@@ -51,20 +51,22 @@ class TrainingExporter {
       return sessionsPath
     }
 
-    // CSV header: session_id, tick, sub_tick, f0, f1, ..., f119, rank, score
+    // CSV header: session_id, tick, sub_tick, f0, f1, ..., f161, action, rank, score
     const firstFeatures = JSON.parse(ticks[0].my_features)
     const featureCount = firstFeatures.length
     const header = ['session_id', 'tick', 'sub_tick']
     for (let i = 0; i < featureCount; i++) header.push(`f${i}`)
-    header.push('rank', 'score')
+    header.push('action', 'rank', 'score')
 
     const lines = [header.join(',')]
     for (const t of ticks) {
       const features = JSON.parse(t.my_features)
       const result = JSON.parse(t.game_result || '{}') || {}
+      const decision = JSON.parse(t.my_decision || 'null')
+      const action = decision ? (decision.action || 'stay') : 'stay'
       const row = [t.session_id, t.tick, t.sub_tick]
       row.push(...features)
-      row.push(result.rank || 0, result.score || 0)
+      row.push(action, result.rank || 0, result.score || 0)
       lines.push(row.join(','))
     }
 

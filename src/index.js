@@ -105,9 +105,19 @@ async function main() {
 
       const result = exporter.exportForTraining(game)
       if (result) {
-        trainer.run(game).then(success => {
+        trainer.run(game).then(async (success) => {
           if (success) {
-            log.info('New model will be loaded automatically via hot-reload')
+            log.info('New model trained, attempting server upload...')
+            const modelPath = path.join(modelDir, 'gc', 'gc_move_model.onnx')
+            try {
+              const fs = require('fs')
+              if (fs.existsSync(modelPath)) {
+                const uploadResult = await gc.api.uploadModel(modelPath)
+                log.info(`Model uploaded to server: v${uploadResult.model_version}`)
+              }
+            } catch (err) {
+              log.warn(`Model upload failed (server may not support it yet): ${err.message}`)
+            }
           }
         })
       }
