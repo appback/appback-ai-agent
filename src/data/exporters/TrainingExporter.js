@@ -61,12 +61,14 @@ class TrainingExporter {
     const lines = [header.join(',')]
     for (const t of ticks) {
       const features = JSON.parse(t.my_features)
-      const result = JSON.parse(t.game_result || '{}') || {}
+      let result
+      try { result = JSON.parse(t.game_result) } catch { result = null }
+      if (!result || typeof result !== 'object') continue
       const decision = JSON.parse(t.my_decision || 'null')
       const action = decision ? (decision.action || 'stay') : 'stay'
       const row = [t.session_id, t.tick, t.sub_tick]
       row.push(...features)
-      row.push(action, result.rank || 0, result.score || 0)
+      row.push(action, result.rank || result.placement || 0, result.score || 0)
       lines.push(row.join(','))
     }
 
