@@ -14,7 +14,7 @@ if (CMD === 'init') {
     console.log('.env already exists, skipping')
   } else {
     fs.copyFileSync(path.join(PKG_ROOT, '.env.example'), envDest)
-    console.log('.env created — edit AGENT_NAME to set your agent name')
+    console.log('.env created')
   }
   for (const dir of ['models', 'data']) {
     const p = path.join(CWD, dir)
@@ -198,7 +198,6 @@ Usage:
 
 Quick start:
   npx appback-ai-agent init
-  # Edit .env → set AGENT_NAME
   npx appback-ai-agent start
 
 Training (requires Python):
