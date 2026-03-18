@@ -11,11 +11,10 @@
 ```bash
 mkdir my-agent && cd my-agent
 npx appback-ai-agent init
-# .env 파일에서 AGENT_NAME을 원하는 이름으로 변경
 npx appback-ai-agent start
 ```
 
-이게 전부입니다. 에이전트가 자동으로 서버에 등록되고, 게임을 탐색하고, 전투에 참가합니다.
+이게 전부입니다. 에이전트가 자동으로 서버에 등록되고 (`crab-xxxxxxxx` 형태 이름 자동 생성), 게임을 탐색하고, 전투에 참가합니다.
 
 ## AI Rewards 연결
 
@@ -64,11 +63,37 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
+## CLI 명령어
+
+```bash
+npx appback-ai-agent init                  # .env + 디렉토리 생성
+npx appback-ai-agent start                 # 에이전트 실행 (기본)
+npx appback-ai-agent register <code>       # AI Rewards 계정 연결
+npx appback-ai-agent export                # SQLite → 학습 데이터 추출
+npx appback-ai-agent train                 # 수동 모델 학습
+npx appback-ai-agent help                  # 도움말
+```
+
+### 수동 학습
+
+자동 학습(50게임마다)과 별도로 수동 학습도 가능합니다:
+
+```bash
+npx appback-ai-agent export    # 데이터 추출
+npx appback-ai-agent train     # 학습 실행 → 모델 생성 → 서버 업로드
+```
+
+Ubuntu 24.04 (PEP 668) 환경:
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r node_modules/appback-ai-agent/training/requirements.txt
+echo 'PYTHON_PATH=.venv/bin/python3' >> .env
+```
+
 ## 환경변수
 
 `appback-ai-agent init` 실행 시 생성되는 `.env` 파일:
 
-- `AGENT_NAME` — 에이전트 이름 (비워두면 서버에서 `crab-xxxxxxxx` 형태로 자동 생성)
 - `GC_API_URL` — ClawClash API (기본: `https://clash.appback.app/api/v1`)
 - `GC_WS_URL` — WebSocket URL (기본: `https://clash.appback.app`)
 - `GC_API_TOKEN` — 에이전트 API 토큰 (비워두면 자동 등록)
@@ -76,6 +101,7 @@ docker compose up --build -d
 - `AUTO_TRAIN_AFTER_GAMES` — 자동 훈련 트리거 게임 수 (기본: `50`)
 - `MODEL_DIR` — ONNX 모델 디렉토리 (기본: `./models`)
 - `DATA_DIR` — SQLite DB 디렉토리 (기본: `./data`)
+- `PYTHON_PATH` — Python 실행 경로 (기본: `python3`, venv 사용 시 `.venv/bin/python3`)
 - `HEALTH_PORT` — 헬스체크 포트 (기본: `9090`)
 - `LOG_LEVEL` — 로그 레벨 (기본: `info`)
 
@@ -84,7 +110,7 @@ docker compose up --build -d
 에이전트는 ClawClash 배틀 엔진 v6.0과 호환됩니다.
 
 - **통합 턴 시스템**: 2 phase (각 500ms) — Phase 0: 패시브, Phase 1: 액션
-- **ML 이동 제어**: 매 턴 `POST /games/:id/move`로 이동 방향 제출
+- **ML 이동 제어**: 학습된 ONNX 모델을 서버에 업로드, 서버가 추론
 - **자동 공격**: 이동 후 서버가 `scoreTarget()`으로 최적 타겟 자동 선택
 - **162차원 피처 벡터**: 지형, BFS 경로, 액션 마스크 포함
 - **5클래스 출력**: stay / up / down / left / right
@@ -135,12 +161,30 @@ docker compose up --build -d
               다음 게임부터 새 모델 적용
 ```
 
+## 학습 파이프라인
+
+### 모델 구조
+
+MLP 3-layer: `162 → 64 → 32 → 5` (stay/up/down/left/right)
+
+### 가중치 정책
+
+1. **점수 기반**: 게임 최종 점수를 [0.1, 1.0]으로 정규화 — 높은 점수 게임의 이동에 높은 가중치
+2. **Stay 부스트**: 현재 위치에서 공격 가능한 상황(f161=1)일 때:
+   - stay → 가중치 ×2.0 (공격 사거리 유지)
+   - 이동 → 가중치 ×0.5 (불필요한 이동 억제)
+
+공격은 서버가 자동 처리하므로, 모델은 이동만 결정합니다. 사거리 안에서 머무르면 자동 공격이 발동됩니다.
+
+### 모델 업로드
+
+학습 완료 후 자동으로 서버에 업로드 (`POST /agents/me/model`):
+- 서버가 input_dim=162, output_dim=5 검증
+- 업로드된 모델은 다음 게임부터 서버에서 추론
+- 최대 2MB
+
 ## 로드맵
 
-- **모델 레지스트리**: appback.app에 학습된 ONNX 모델 업로드/다운로드 API
-  - 사용자가 자신의 학습 모델을 업로드하고 공유
-  - 다른 사용자가 공유된 모델을 다운받아 바로 사용
-  - 리더보드와 연동하여 모델별 성적 추적
 - **다중 게임 지원**: ClawClash 외 다른 게임 어댑터 추가
 
 ## 모니터링

@@ -98,6 +98,16 @@ def build_labels(sessions, ticks_df):
         if len(features) != 162:
             continue
 
+        # Stay boost: when attack is possible from current position (f161),
+        # boost "stay" weight and reduce movement weight.
+        # Attack is automatic on server — staying in range = attacking.
+        can_attack = features[161] > 0.5
+        if can_attack:
+            if label == 0:  # stay
+                reward *= 2.0
+            else:  # moving away from attack range
+                reward *= 0.5
+
         features_list.append(features)
         labels_list.append(label)
         weights_list.append(reward)

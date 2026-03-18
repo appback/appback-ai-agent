@@ -6,7 +6,7 @@
 ## 패키지 정보
 
 - **npm**: `appback-ai-agent`
-- **현재 버전**: 1.0.21
+- **현재 버전**: 1.2.2
 - **라이선스**: MIT
 
 ---
@@ -148,9 +148,9 @@ appback-ai-agent/
 │       ├── metrics.js          # 게임 성과 지표 추적
 │       └── retry.js            # 지수 백오프 재시도
 ├── training/                   # Python 학습 파이프라인
-│   ├── train_gc_model.py
-│   ├── models/gc_strategy_net.py
-│   ├── requirements.txt
+│   ├── train_gc_model.py       # 이동 5클래스 학습 (score 가중치 + stay 부스트)
+│   ├── models/gc_move_net.py   # MLP 162→64→32→5
+│   ├── requirements.txt        # torch, onnx, onnxscript 등
 │   └── data/raw/               # 내보낸 학습 데이터
 ├── .env.example
 └── package.json
@@ -164,7 +164,7 @@ appback-ai-agent/
 │   └── agent.db  # SQLite DB (identity, sessions, ticks, metrics)
 └── models/
     └── gc/
-        └── gc_strategy_model.onnx  # 학습된 모델 (선택)
+        └── gc_move_model.onnx  # 학습된 이동 모델 (선택)
 ```
 
 ---
@@ -176,6 +176,8 @@ appback-ai-agent/
 | `npx appback-ai-agent init` | .env 복사 + data/, models/ 디렉토리 생성 |
 | `npx appback-ai-agent start` | 에이전트 실행 (기본 명령) |
 | `npx appback-ai-agent register <code>` | AI Rewards 계정에 에이전트 연결 |
+| `npx appback-ai-agent export` | SQLite → 학습 데이터 추출 (JSON/CSV) |
+| `npx appback-ai-agent train` | 수동 모델 학습 실행 (PYTHON_PATH 지원) |
 | `npx appback-ai-agent help` | 도움말 |
 
 ---
@@ -253,6 +255,8 @@ class BaseGameAdapter {
 | POST | `/games/:id/strategy` | 전략 제출 |
 | POST | `/games/:id/move` | 이동 방향 제출 |
 | GET | `/equipment` | 장비 카탈로그 |
+| POST | `/agents/me/model` | ONNX 모델 업로드 (multipart, max 2MB) |
+| DELETE | `/agents/me/model` | 커스텀 모델 삭제 |
 | POST | `/agents/verify-registration` | AI Rewards 등록 코드 인증 |
 
 ### WebSocket 이벤트
@@ -368,7 +372,7 @@ Scheduler tick (안전장치)
 N게임마다 (기본 50)
   → TrainingExporter → JSON/CSV 파일
   → TrainingRunner → Python 학습
-  → models/gc/gc_strategy_model.onnx 생성
+  → models/gc/gc_move_model.onnx 생성
   → ModelRegistry 핫리로드 (파일 감시)
 ```
 
@@ -407,17 +411,25 @@ N게임마다 (기본 50)
 50게임 완료 (AUTO_TRAIN_AFTER_GAMES 간격)
   → TrainingExporter: SQLite → JSON/CSV 파일 (training/data/raw/)
   → TrainingRunner: python3 train_gc_model.py 실행
-  → 모델 생성: models/gc/gc_strategy_model.onnx
+  → 모델 생성: models/gc/gc_move_model.onnx
+  → 서버 업로드: POST /agents/me/model
   → ModelRegistry: 파일 변경 감시 → 핫리로드 (재시작 불필요)
 ```
 
 #### 학습 파이프라인 상세
 
 1. **데이터 내보내기**: `TrainingExporter`가 SQLite에서 완료된 세션과 틱 데이터를 JSON/CSV로 추출
+   - CSV에 162차원 피처 + action 컬럼 포함
+   - `my_decision IS NOT NULL` 필터로 유효 데이터만 추출
 2. **모델 학습**: `TrainingRunner`가 `python3 training/train_gc_model.py` 실행 (PyTorch)
-3. **ONNX 변환**: 학습 스크립트가 PyTorch → ONNX 변환하여 `models/gc/gc_strategy_model.onnx` 저장
-4. **핫리로드**: `ModelRegistry`의 파일 감시자가 .onnx 파일 변경 감지 → 자동 로드 (에이전트 재시작 불필요)
-5. **적용**: 다음 틱부터 모델 기반 이동 결정 활성화
+   - 이동 5클래스 분류 (stay/up/down/left/right)
+   - 가중치 정책:
+     - **점수 기반**: 게임 최종 점수 [0.1, 1.0] 정규화
+     - **Stay 부스트**: f161=1 (공격 가능)일 때 stay ×2.0, 이동 ×0.5
+3. **ONNX 변환**: PyTorch → ONNX (opset 17), 단일 파일로 재저장 (torch 2.10+ .data 분리 대응)
+4. **서버 업로드**: `POST /agents/me/model`로 자동 업로드 (서버가 input_dim=162, output_dim=5 검증)
+5. **핫리로드**: `ModelRegistry`의 파일 감시자가 .onnx 파일 변경 감지 → 자동 로드
+6. **적용**: 서버에서 업로드된 모델로 추론 (로컬은 fallback용)
 
 ---
 
@@ -427,12 +439,12 @@ N게임마다 (기본 50)
 |---|---|---|
 | `GC_API_URL` | `https://clash.appback.app/api/v1` | GC REST API |
 | `GC_WS_URL` | `https://clash.appback.app` | GC WebSocket |
-| `GC_API_TOKEN` | (필수) | 에이전트 인증 토큰 |
-| `AGENT_NAME` | (비어있음) | 에이전트 이름 |
+| `GC_API_TOKEN` | (비어있음) | 에이전트 인증 토큰 (비워두면 자동 등록) |
 | `GAME_DISCOVERY_INTERVAL_SEC` | `30` | 게임 탐색 간격 (초) |
 | `MODEL_DIR` | `./models` | 모델 파일 경로 |
 | `DATA_DIR` | `./data` | SQLite DB 경로 |
 | `AUTO_TRAIN_AFTER_GAMES` | `50` | 자동 학습 트리거 게임 수 |
+| `PYTHON_PATH` | `python3` | Python 실행 경로 (venv 사용 시 `.venv/bin/python3`) |
 | `LOG_LEVEL` | `info` | 로그 레벨 (debug/info/warn/error) |
 | `HEALTH_PORT` | `9090` | 헬스체크 HTTP 포트 |
 
