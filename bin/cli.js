@@ -6,6 +6,13 @@ const path = require('path')
 const CMD = process.argv[2]
 const PKG_ROOT = path.resolve(__dirname, '..')
 const CWD = process.cwd()
+const PKG_VERSION = require(path.join(PKG_ROOT, 'package.json')).version
+
+// ── version ──
+if (CMD === 'version' || CMD === '--version' || CMD === '-v') {
+  console.log(`appback-ai-agent v${PKG_VERSION}`)
+  process.exit(0)
+}
 
 // ── init: 현재 디렉토리에 .env + 디렉토리 생성 ──
 if (CMD === 'init') {
@@ -186,7 +193,7 @@ if (CMD === 'start' || !CMD) {
 }
 
 // ── help ──
-console.log(`appback-ai-agent — AI game agent framework
+console.log(`appback-ai-agent v${PKG_VERSION} — AI game agent framework
 
 Usage:
   npx appback-ai-agent init                  Create .env and directories
@@ -194,6 +201,7 @@ Usage:
   npx appback-ai-agent register <code>       Link agent to AI Rewards account
   npx appback-ai-agent export                Export training data from DB
   npx appback-ai-agent train                 Run model training manually
+  npx appback-ai-agent version               Show version
   npx appback-ai-agent help                  Show this help
 
 Quick start:
