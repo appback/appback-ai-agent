@@ -189,10 +189,36 @@ MLP 3-layer: `162 → 64 → 32 → 5` (stay/up/down/left/right)
 
 ## 모니터링
 
+### 로그 확인
+
 ```bash
+# pm2 — 최근 로그 확인
+pm2 logs appback-ai-agent --lines 50
+
+# pm2 — 실시간 스트리밍
+pm2 logs appback-ai-agent
+
+# nohup — 로그 파일 직접 확인
+tail -50 agent.log
+```
+
+### 헬스체크
+
+```bash
+# 구동 상태 확인
 curl http://localhost:9090/health
+
+# 성과 지표 (승률, 평균 랭크, 게임 수 등)
 curl http://localhost:9090/metrics
 ```
+
+### 주요 로그 패턴
+
+- `Result: rank=1, score=1229` — 게임 종료 결과
+- `[metrics] win: 17.7% | top3: 45.8%` — 누적 성적
+- `Training completed successfully` — 학습 완료
+- `Model uploaded to server: v3` — 서버 모델 업로드 성공
+- `Failed to start training process` — Python 미설치 (게임은 정상 진행)
 
 ## 라이선스
 
