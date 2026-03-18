@@ -66,9 +66,26 @@ class GcAdapter extends BaseGameAdapter {
       }
     }
 
-    // No token available — cannot proceed
+    // No token available — auto-register
     if (!this.apiToken) {
-      throw new Error('No agent token found. Run "npx appback-ai-agent init" to register.')
+      log.info('No agent token found. Auto-registering...')
+      const name = this.config.agentName || `agent-${Date.now().toString(36)}`
+      try {
+        const reg = await this.api.register(name)
+        this.apiToken = reg.api_token || reg.token
+        this.agentId = reg.agent_id || reg.id
+        this.api.setToken(this.apiToken)
+        log.info(`Registered as: ${reg.name || name} (${this.agentId})`)
+
+        // Persist to SQLite
+        if (this.dataCollector) {
+          this.dataCollector.store.saveIdentity(this.gameName, this.agentId, this.apiToken, reg.name || name)
+          log.info('Identity saved to database')
+        }
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message
+        throw new Error(`Auto-registration failed: ${msg}`)
+      }
     }
 
     // Load equipment for feature builder + equipment manager

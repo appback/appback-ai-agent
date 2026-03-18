@@ -52,18 +52,21 @@ class ModelRegistry {
     const modelsDir = this.modelDir
     if (!fs.existsSync(modelsDir)) return
 
-    this._watcher = fs.watch(modelsDir, { recursive: true }, (eventType, filename) => {
-      if (!filename?.endsWith('.onnx')) return
-      const parts = filename.split(path.sep)
-      if (parts.length >= 2) {
-        const gameKey = parts[0]
-        const modelKey = parts[1].replace('.onnx', '')
-        log.info(`Model file changed: ${filename}, triggering reload`)
-        this.hotReload(gameKey, modelKey).catch(() => {})
-      }
-    })
-
-    log.info('Model directory watcher started')
+    try {
+      this._watcher = fs.watch(modelsDir, { recursive: true }, (eventType, filename) => {
+        if (!filename?.endsWith('.onnx')) return
+        const parts = filename.split(path.sep)
+        if (parts.length >= 2) {
+          const gameKey = parts[0]
+          const modelKey = parts[1].replace('.onnx', '')
+          log.info(`Model file changed: ${filename}, triggering reload`)
+          this.hotReload(gameKey, modelKey).catch(() => {})
+        }
+      })
+      log.info('Model directory watcher started')
+    } catch (err) {
+      log.warn(`Model watcher unavailable (${err.message}), hot-reload disabled`)
+    }
   }
 
   stopWatcher() {

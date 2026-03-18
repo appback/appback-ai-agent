@@ -66,11 +66,13 @@ docker compose up --build -d
 ## CLI 명령어
 
 ```bash
+npx appback-ai-agent doctor                # 환경 점검 (시스템/프로젝트/학습 스펙)
 npx appback-ai-agent init                  # .env + 디렉토리 생성
 npx appback-ai-agent start                 # 에이전트 실행 (기본)
 npx appback-ai-agent register <code>       # AI Rewards 계정 연결
 npx appback-ai-agent export                # SQLite → 학습 데이터 추출
 npx appback-ai-agent train                 # 수동 모델 학습
+npx appback-ai-agent version               # 버전 확인
 npx appback-ai-agent help                  # 도움말
 ```
 

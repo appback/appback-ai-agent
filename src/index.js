@@ -30,7 +30,8 @@ const { createLogger } = require('./utils/logger')
 const log = createLogger('main')
 
 async function main() {
-  log.info('appback-ai-agent v0.4.0 starting...')
+  const pkgVersion = require(path.join(__dirname, '..', 'package.json')).version
+  log.info(`appback-ai-agent v${pkgVersion} starting...`)
 
   const eventBus = new EventBus()
   const modelDir = process.env.MODEL_DIR || './models'

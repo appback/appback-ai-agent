@@ -6,7 +6,7 @@
 ## 패키지 정보
 
 - **npm**: `appback-ai-agent`
-- **현재 버전**: 1.2.2
+- **현재 버전**: 1.3.3
 - **라이선스**: MIT
 
 ---
@@ -173,11 +173,13 @@ appback-ai-agent/
 
 | 명령 | 설명 |
 |---|---|
+| `npx appback-ai-agent doctor` | 환경 점검 (시스템/프로젝트/에이전트/학습 스펙) |
 | `npx appback-ai-agent init` | .env 복사 + data/, models/ 디렉토리 생성 |
-| `npx appback-ai-agent start` | 에이전트 실행 (기본 명령) |
+| `npx appback-ai-agent start` | 에이전트 실행 (기본 명령). 토큰 없으면 자동 등록 |
 | `npx appback-ai-agent register <code>` | AI Rewards 계정에 에이전트 연결 |
 | `npx appback-ai-agent export` | SQLite → 학습 데이터 추출 (JSON/CSV) |
 | `npx appback-ai-agent train` | 수동 모델 학습 실행 (PYTHON_PATH 지원) |
+| `npx appback-ai-agent version` | 버전 확인 |
 | `npx appback-ai-agent help` | 도움말 |
 
 ---
@@ -245,7 +247,7 @@ class BaseGameAdapter {
 
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
-| POST | `/agents/register` | 에이전트 등록 (현재 비활성) |
+| POST | `/agents/register` | 에이전트 자동 등록 (토큰 없을 때 start 시 호출) |
 | GET | `/agents/me` | 토큰 검증 + 에이전트 정보 |
 | GET | `/challenge` | 챌린지 가능 여부 확인 |
 | POST | `/challenge` | 챌린지 제출 (무기/방어구 선택) |
@@ -276,6 +278,7 @@ class BaseGameAdapter {
 initialize()
   ├─ 토큰 로드 (SQLite → env 순서)
   ├─ 토큰 검증 (GET /agents/me)
+  ├─ 토큰 없으면 → 자동 등록 (POST /agents/register → SQLite 저장)
   ├─ 장비 카탈로그 로드
   ├─ ONNX 모델 로드 (선택)
   └─ WebSocket 연결 + 이벤트 핸들러 등록
@@ -428,7 +431,7 @@ N게임마다 (기본 50)
      - **Stay 부스트**: f161=1 (공격 가능)일 때 stay ×2.0, 이동 ×0.5
 3. **ONNX 변환**: PyTorch → ONNX (opset 17), 단일 파일로 재저장 (torch 2.10+ .data 분리 대응)
 4. **서버 업로드**: `POST /agents/me/model`로 자동 업로드 (서버가 input_dim=162, output_dim=5 검증)
-5. **핫리로드**: `ModelRegistry`의 파일 감시자가 .onnx 파일 변경 감지 → 자동 로드
+5. **핫리로드**: `ModelRegistry`의 파일 감시자가 .onnx 파일 변경 감지 → 자동 로드 (Linux Node 18 이하에서는 watcher 비활성, 재시작으로 대체)
 6. **적용**: 서버에서 업로드된 모델로 추론 (로컬은 fallback용)
 
 ---
@@ -454,6 +457,25 @@ N게임마다 (기본 50)
 
 - `GET :9090/health` → `{ "status": "ok", "uptime": "1h 30m 5s" }`
 - `GET :9090/metrics` → 게임 성과 + 어댑터 상태 (activeGameId, gamePhase)
+
+포트 충돌 시 자동으로 +1 증가 (최대 10회 시도). 같은 머신에서 여러 에이전트 실행 가능.
+
+---
+
+## doctor 명령어
+
+`npx appback-ai-agent doctor`로 환경을 점검합니다.
+
+```
+[ System ]      — Node.js 버전, npm, OS
+[ Project ]     — .env, data/, models/ 존재 여부
+[ Agent ]       — better-sqlite3, 에이전트 등록 상태, ONNX 모델
+[ Training ]    — RAM (≥2GB), Disk (≥3GB), Python (3.8+), PyTorch
+```
+
+- Training 섹션은 선택 사항. 미충족이어도 에이전트 실행 가능 (룰 기반)
+- PyTorch 미설치 시 venv 설치 가이드 안내
+- `.env`의 `PYTHON_PATH` 설정을 인식하여 해당 Python으로 점검
 
 ---
 

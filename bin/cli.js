@@ -14,6 +14,143 @@ if (CMD === 'version' || CMD === '--version' || CMD === '-v') {
   process.exit(0)
 }
 
+// ── doctor: 환경 점검 ──
+if (CMD === 'doctor') {
+  const { execSync } = require('child_process')
+  const checks = []
+
+  function check(name, fn) {
+    try {
+      const result = fn()
+      checks.push({ name, ok: true, detail: result })
+      console.log(`  ✓ ${name}: ${result}`)
+    } catch (err) {
+      checks.push({ name, ok: false, detail: err.message })
+      console.log(`  ✗ ${name}: ${err.message}`)
+    }
+  }
+
+  function run(cmd) { return execSync(cmd, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).trim() }
+
+  console.log(`\nappback-ai-agent v${PKG_VERSION} — environment check\n`)
+  console.log('[ System ]')
+  check('Node.js', () => {
+    const v = process.version
+    const major = parseInt(v.slice(1))
+    if (major < 18) throw new Error(`${v} (requires >= 18)`)
+    return v
+  })
+  check('npm', () => run('npm -v'))
+  check('OS', () => `${process.platform} ${process.arch}`)
+
+  console.log('\n[ Project ]')
+  check('Working dir', () => CWD)
+  check('.env', () => {
+    const p = path.join(CWD, '.env')
+    if (!fs.existsSync(p)) throw new Error('not found — run: appback-ai-agent init')
+    return p
+  })
+  check('data/', () => {
+    const p = path.join(CWD, 'data')
+    if (!fs.existsSync(p)) throw new Error('not found — run: appback-ai-agent init')
+    return p
+  })
+  check('models/', () => {
+    const p = path.join(CWD, 'models')
+    if (!fs.existsSync(p)) throw new Error('not found — run: appback-ai-agent init')
+    return p
+  })
+
+  console.log('\n[ Agent ]')
+  check('better-sqlite3', () => {
+    require('better-sqlite3')
+    return 'OK'
+  })
+  check('Agent identity', () => {
+    const dbPath = path.join(CWD, 'data', 'agent.db')
+    if (!fs.existsSync(dbPath)) throw new Error('no database — run: appback-ai-agent start')
+    const Database = require('better-sqlite3')
+    const db = new Database(dbPath, { readonly: true })
+    const row = db.prepare('SELECT agent_id, name FROM agent_identity WHERE game = ?').get('claw-clash')
+    db.close()
+    if (!row) throw new Error('not registered — run: appback-ai-agent start')
+    return `${row.name} (${row.agent_id})`
+  })
+  check('ONNX model', () => {
+    const p = path.join(CWD, 'models', 'gc', 'gc_strategy_model.onnx')
+    if (!fs.existsSync(p)) throw new Error('not found (will use rule-based)')
+    const size = (fs.statSync(p).size / 1024).toFixed(1)
+    return `${size} KB`
+  })
+
+  console.log('\n[ Training (optional) — requires: RAM ≥ 2GB, Disk ≥ 3GB, Python 3.8+, PyTorch ]')
+  check('RAM', () => {
+    const os = require('os')
+    const totalGB = (os.totalmem() / 1024 / 1024 / 1024).toFixed(1)
+    const freeGB = (os.freemem() / 1024 / 1024 / 1024).toFixed(1)
+    const total = parseFloat(totalGB)
+    if (total < 2) throw new Error(`${totalGB} GB total (requires ≥ 2 GB)`)
+    return `${freeGB} GB free / ${totalGB} GB total`
+  })
+  check('Disk', () => {
+    try {
+      const df = run(`df -BG "${CWD}" | tail -1`)
+      const parts = df.split(/\s+/)
+      const avail = parts[3] || '?'
+      if (parseInt(avail) < 3) throw new Error(`${avail} available (requires ≥ 3 GB)`)
+      return `${avail} available`
+    } catch (e) {
+      if (e.message.includes('available')) throw e
+      return 'unknown'
+    }
+  })
+  // .env의 PYTHON_PATH 또는 시스템 python
+  const envPath = path.join(CWD, '.env')
+  let pyCmd = 'python3'
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8')
+    const m = envContent.match(/^PYTHON_PATH=(.+)$/m)
+    if (m) {
+      const p = m[1].trim()
+      pyCmd = path.isAbsolute(p) ? p : path.resolve(CWD, p)
+    }
+  }
+  check('Python', () => {
+    try { return run(`"${pyCmd}" --version`) } catch {
+      try { return run('python3 --version') } catch {
+        try { return run('python --version') } catch { throw new Error('not found — requires Python 3.8+') }
+      }
+    }
+  })
+  check('PyTorch', () => {
+    try { return run(`"${pyCmd}" -c "import torch; print(torch.__version__)"`) } catch {
+      try { return run('python3 -c "import torch; print(torch.__version__)"') } catch {
+        try { return run('python -c "import torch; print(torch.__version__)"') } catch {
+          throw new Error('not installed')
+        }
+      }
+    }
+  })
+
+  const failed = checks.filter(c => !c.ok && !c.name.startsWith('ONNX') && !['Python', 'PyTorch', 'RAM', 'Disk'].includes(c.name))
+  const trainOk = checks.filter(c => ['Python', 'PyTorch'].includes(c.name)).every(c => c.ok)
+  console.log()
+  if (failed.length === 0) {
+    if (trainOk) {
+      console.log('All checks passed! Ready to run: appback-ai-agent start\n')
+    } else {
+      console.log('Agent ready! Training dependencies missing — agent will play with rule-based AI.')
+      console.log('To enable auto-training:\n')
+      console.log('  python3 -m venv .venv && source .venv/bin/activate')
+      console.log('  pip install torch')
+      console.log('  echo \'PYTHON_PATH=.venv/bin/python3\' >> .env\n')
+    }
+  } else {
+    console.log(`${failed.length} issue(s) found. Fix them and re-run: appback-ai-agent doctor\n`)
+  }
+  process.exit(failed.length > 0 ? 1 : 0)
+}
+
 // ── init: 현재 디렉토리에 .env + 디렉토리 생성 ──
 if (CMD === 'init') {
   const envDest = path.join(CWD, '.env')
@@ -196,6 +333,7 @@ if (CMD === 'start' || !CMD) {
 console.log(`appback-ai-agent v${PKG_VERSION} — AI game agent framework
 
 Usage:
+  npx appback-ai-agent doctor                 Check environment & dependencies
   npx appback-ai-agent init                  Create .env and directories
   npx appback-ai-agent start                 Start the agent (default)
   npx appback-ai-agent register <code>       Link agent to AI Rewards account
