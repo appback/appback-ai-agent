@@ -14,6 +14,7 @@ process.on('uncaughtException', (err) => {
 if (!process.env._PKG_ROOT) require('dotenv').config()
 
 const path = require('path')
+const paths = require('./paths')
 const AgentManager = require('./core/AgentManager')
 const EventBus = require('./core/EventBus')
 const ModelRegistry = require('./core/ModelRegistry')
@@ -34,8 +35,8 @@ async function main() {
   log.info(`appback-ai-agent v${pkgVersion} starting...`)
 
   const eventBus = new EventBus()
-  const modelDir = process.env.MODEL_DIR || './models'
-  const dataDir = process.env.DATA_DIR || './data'
+  const modelDir = paths.modelDir()
+  const dataDir = paths.dataDir()
   const autoTrainAfter = parseInt(process.env.AUTO_TRAIN_AFTER_GAMES || '50')
   const healthPort = parseInt(process.env.HEALTH_PORT || '9090')
 
@@ -44,11 +45,9 @@ async function main() {
   const dataCollector = new DataCollector(store)
   const modelRegistry = new ModelRegistry(modelDir)
   const metrics = new Metrics(store)
-  const pkgRoot = process.env._PKG_ROOT || path.resolve(__dirname, '..')
-  const trainingDataDir = path.join(pkgRoot, 'training', 'data', 'raw')
-  const exporter = new TrainingExporter(store, trainingDataDir)
+  const exporter = new TrainingExporter(store, paths.trainingDataDir())
   const trainer = new TrainingRunner({
-    dataDir: trainingDataDir,
+    dataDir: paths.trainingDataDir(),
     outputDir: `${modelDir}/gc`,
     autoTrainAfterGames: autoTrainAfter,
   })

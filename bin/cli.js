@@ -242,15 +242,15 @@ if (CMD === 'export') {
   if (fs.existsSync(envPath)) require('dotenv').config({ path: envPath })
   else require('dotenv').config()
 
-  const rawDataDir = process.env.DATA_DIR || 'data'
-  const dataDir = path.isAbsolute(rawDataDir) ? rawDataDir : path.resolve(CWD, rawDataDir)
-  process.env.DATA_DIR = dataDir
-
+  process.env._PKG_ROOT = PKG_ROOT
+  process.env._AGENT_CWD = CWD
+  const paths = require(path.join(PKG_ROOT, 'src', 'paths'))
   const SqliteStore = require(path.join(PKG_ROOT, 'src', 'data', 'storage', 'SqliteStore'))
   const TrainingExporter = require(path.join(PKG_ROOT, 'src', 'data', 'exporters', 'TrainingExporter'))
 
+  const dataDir = paths.dataDir()
+  const exportDir = paths.trainingDataDir()
   const store = new SqliteStore(dataDir)
-  const exportDir = path.join(PKG_ROOT, 'training', 'data', 'raw')
   const exporter = new TrainingExporter(store, exportDir)
   const result = exporter.exportForTraining('claw-clash', 1)
   store.close()
@@ -269,21 +269,23 @@ if (CMD === 'train') {
   if (fs.existsSync(envPath)) require('dotenv').config({ path: envPath })
   else require('dotenv').config()
 
+  process.env._PKG_ROOT = PKG_ROOT
+  process.env._AGENT_CWD = CWD
+  const paths = require(path.join(PKG_ROOT, 'src', 'paths'))
   const { spawn: spawnProc } = require('child_process')
   const pythonPath = process.env.PYTHON_PATH || 'python3'
-  const scriptPath = path.join(PKG_ROOT, 'training', 'train_gc_model.py')
-  const dataDir = path.join(PKG_ROOT, 'training', 'data', 'raw')
-  const modelDir = process.env.MODEL_DIR || path.join(CWD, 'models')
-  const outputDir = path.join(modelDir, 'gc')
+
+  const dataDir = paths.trainingDataDir()
+  const outputDir = path.join(paths.modelDir(), 'gc')
 
   console.log(`Python: ${pythonPath}`)
   console.log(`Data:   ${dataDir}`)
   console.log(`Output: ${outputDir}`)
   console.log()
 
-  const proc = spawnProc(pythonPath, [scriptPath, '--data-dir', dataDir, '--output-dir', outputDir], {
+  const proc = spawnProc(pythonPath, [paths.trainingScript(), '--data-dir', dataDir, '--output-dir', outputDir], {
     stdio: 'inherit',
-    env: { ...process.env, PYTHONPATH: path.join(PKG_ROOT, 'training') },
+    env: { ...process.env, PYTHONPATH: paths.trainingRoot() },
   })
   proc.on('close', (code) => process.exit(code || 0))
   proc.on('error', (err) => {
@@ -321,9 +323,9 @@ if (CMD === 'start' || !CMD) {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
   }
 
-  // training 경로는 패키지 내부
-  process.env._TRAINING_DIR = path.join(PKG_ROOT, 'training')
+  // 경로 설정 (src/paths.js에서 참조)
   process.env._PKG_ROOT = PKG_ROOT
+  process.env._AGENT_CWD = CWD
 
   require(path.join(PKG_ROOT, 'src', 'index.js'))
   return
