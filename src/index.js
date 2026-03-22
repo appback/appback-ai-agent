@@ -44,9 +44,9 @@ async function main() {
   const dataCollector = new DataCollector(store)
   const modelRegistry = new ModelRegistry(modelDir)
   const metrics = new Metrics(store)
-  const exporter = new TrainingExporter(store)
   const pkgRoot = process.env._PKG_ROOT || path.resolve(__dirname, '..')
   const trainingDataDir = path.join(pkgRoot, 'training', 'data', 'raw')
+  const exporter = new TrainingExporter(store, trainingDataDir)
   const trainer = new TrainingRunner({
     dataDir: trainingDataDir,
     outputDir: `${modelDir}/gc`,

@@ -19,10 +19,9 @@ class GcApiClient {
     this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`
   }
 
-  async register(name) {
-    log.info(`Registering agent: ${name}`)
+  async register() {
+    log.info('Registering agent...')
     const { data } = await this.client.post('/agents/register', {
-      name,
       model_name: 'appback-ai-agent',
     })
     return data

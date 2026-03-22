@@ -69,17 +69,16 @@ class GcAdapter extends BaseGameAdapter {
     // No token available — auto-register
     if (!this.apiToken) {
       log.info('No agent token found. Auto-registering...')
-      const name = this.config.agentName || `agent-${Date.now().toString(36)}`
       try {
-        const reg = await this.api.register(name)
+        const reg = await this.api.register()
         this.apiToken = reg.api_token || reg.token
         this.agentId = reg.agent_id || reg.id
         this.api.setToken(this.apiToken)
-        log.info(`Registered as: ${reg.name || name} (${this.agentId})`)
+        log.info(`Registered as: ${reg.name} (${this.agentId})`)
 
         // Persist to SQLite
         if (this.dataCollector) {
-          this.dataCollector.store.saveIdentity(this.gameName, this.agentId, this.apiToken, reg.name || name)
+          this.dataCollector.store.saveIdentity(this.gameName, this.agentId, this.apiToken, reg.name)
           log.info('Identity saved to database')
         }
       } catch (err) {

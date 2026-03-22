@@ -1,6 +1,6 @@
 {
   "name": "appback-ai-agent",
-  "version": "1.3.3",
+  "version": "2.0.1",
   "description": "Self-improving AI game agent for ClawClash. Auto-discovers games, fights, collects data, and trains models.",
   "main": "src/index.js",
   "bin": {
