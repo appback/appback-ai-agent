@@ -468,14 +468,16 @@ class GcAdapter extends BaseGameAdapter {
       if (this.modelRegistry && features) {
         const model = this.modelRegistry.getProvider('gc', 'gc_move_model') || this.modelRegistry.getProvider('gc', 'gc_strategy_model')
         if (model) {
-          const rawLogits = await model.infer(features)
-          logits = Array.from(rawLogits)
+          const result = await model.infer(features)
+          logits = result?.logits || null
 
-          // Apply action mask
-          const masked = logits.map((v, i) => actionMask[i] ? v : -Infinity)
-          const bestIdx = masked.indexOf(Math.max(...masked))
-          direction = ACTION_LABELS[bestIdx] || 'stay'
-          source = 'model'
+          if (logits && logits.length > 0) {
+            // Apply action mask
+            const masked = logits.map((v, i) => actionMask[i] ? v : -Infinity)
+            const bestIdx = masked.indexOf(Math.max(...masked))
+            direction = ACTION_LABELS[bestIdx] || 'stay'
+            source = 'model'
+          }
 
           log.debug(`Model move: ${direction} (logits: [${masked.map(v => v.toFixed(2)).join(',')}])`)
         }
