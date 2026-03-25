@@ -1,20 +1,19 @@
 /**
- * GcFeatureBuilder — Client-side port of server featureBuilder.js (v6.0)
+ * GcFeatureBuilder — Client-side port of server featureBuilder.js (v7.0)
  * Converts tick data into ONNX-compatible feature vectors.
  *
- * v6.0: 162-dim move features (attack is automatic on server)
+ * v7.0: 153-dim move features (map-size independent)
  *
  * Layout:
  *   [0..21]    Self features (22)
  *   [22..25]   Strategy (4)
  *   [26..115]  Opponents 6×15 = 90
  *   [116..119] Arena context (4)
- *   [120..144] 5×5 local terrain (25)
- *   [145..148] Directional move validity (4)
- *   [149..156] BFS path distances (8)
- *   [157..160] Attack possible after move (4)
- *   [161]      Can attack from current pos (1)
- * Total: 162
+ *   [120..143] 8-directional summary: 8 dirs × 3 (wall/enemy/powerup dist) = 24
+ *   [144..147] Directional move validity (4)
+ *   [148..151] Attack possible after move (4)
+ *   [152]      Can attack from current pos (1)
+ * Total: 153
  */
 
 const WEAPON_SLUGS = ['sword', 'dagger', 'hammer', 'bow', 'spear']
@@ -24,6 +23,16 @@ const DIRECTIONS = [
   { dir: 'down',  dx: 0,  dy: 1 },
   { dir: 'left',  dx: -1, dy: 0 },
   { dir: 'right', dx: 1,  dy: 0 }
+]
+const DIRECTIONS_8 = [
+  { dx: 0,  dy: -1 },  // up
+  { dx: 0,  dy: 1 },   // down
+  { dx: -1, dy: 0 },   // left
+  { dx: 1,  dy: 0 },   // right
+  { dx: -1, dy: -1 },  // up-left
+  { dx: 1,  dy: -1 },  // up-right
+  { dx: -1, dy: 1 },   // down-left
+  { dx: 1,  dy: 1 },   // down-right
 ]
 
 class GcFeatureBuilder {
@@ -106,7 +115,7 @@ class GcFeatureBuilder {
   }
 
   /**
-   * Build 162-dim move feature vector (v6.0)
+   * Build 153-dim move feature vector (v7.0)
    */
   buildMoveFeatures(agent, gameState) {
     const gridW = this.gridWidth
@@ -115,7 +124,7 @@ class GcFeatureBuilder {
     const living = gameState.agents.filter(a => a.alive)
     const shrinkPhase = gameState.shrinkPhase || gameState.shrink_phase || 0
 
-    const vec = new Array(162).fill(0)
+    const vec = new Array(153).fill(0)
     let idx = 0
 
     // --- Self features (22) ---
@@ -183,25 +192,17 @@ class GcFeatureBuilder {
     vec[idx++] = safe(living.length / 8)                                            // 117
     const nearPU = findNearestPowerup(agent, gameState.powerups)
     vec[idx++] = nearPU ? safe(manhattan(agent, nearPU) / 14) : 1.0                // 118
-    vec[idx++] = 1.0  // 119 (heal tile removed, reserved)
+    vec[idx++] = 1.0  // 119 (reserved)
     // idx = 120
 
-    // --- 5×5 local terrain (25) ---  [120..144]
-    const occupied = buildOccupiedSet(gameState, agent.slot)
-    for (let ly = -2; ly <= 2; ly++) {
-      for (let lx = -2; lx <= 2; lx++) {
-        const wx = agent.x + lx
-        const wy = agent.y + ly
-        if (wx < 0 || wx >= gridW || wy < 0 || wy >= gridH) {
-          vec[idx++] = 0.33  // out of bounds = wall
-        } else {
-          vec[idx++] = safe(getTerrain(terrain, wx, wy) / 3)
-        }
-      }
-    }
-    // idx = 145
+    // --- 8-directional summary (24) ---  [120..143]
+    const maxDim = Math.max(gridW, gridH)
+    const dirSummary = buildDirectionalSummary(agent, enemies, gameState.powerups, terrain, gridW, gridH, maxDim)
+    for (let i = 0; i < 24; i++) vec[idx++] = dirSummary[i]
+    // idx = 144
 
-    // --- Directional move validity (4) ---  [145..148]
+    // --- Directional move validity (4) ---  [144..147]
+    const occupied = buildOccupiedSet(gameState, agent.slot)
     const moveValidity = []
     for (const { dx, dy } of DIRECTIONS) {
       const nx = agent.x + dx
@@ -213,38 +214,9 @@ class GcFeatureBuilder {
       moveValidity.push(valid ? 1 : 0)
       vec[idx++] = valid ? 1 : 0
     }
-    // idx = 149
+    // idx = 148
 
-    // --- BFS path distances (8) ---  [149..156]
-    const nearestEnemy = enemies[0] || null
-    const maxDist = gridW + gridH
-
-    // BFS to nearest enemy per direction [149..152]
-    for (let d = 0; d < 4; d++) {
-      if (!moveValidity[d] || !nearestEnemy) {
-        vec[idx++] = 1.0
-      } else {
-        const nx = agent.x + DIRECTIONS[d].dx
-        const ny = agent.y + DIRECTIONS[d].dy
-        const dist = bfsDistance(nx, ny, nearestEnemy.x, nearestEnemy.y, terrain, gridW, gridH)
-        vec[idx++] = safe(dist / maxDist)
-      }
-    }
-
-    // BFS to nearest powerup per direction [153..156]
-    for (let d = 0; d < 4; d++) {
-      if (!moveValidity[d] || !nearPU) {
-        vec[idx++] = 1.0
-      } else {
-        const nx = agent.x + DIRECTIONS[d].dx
-        const ny = agent.y + DIRECTIONS[d].dy
-        const dist = bfsDistance(nx, ny, nearPU.x, nearPU.y, terrain, gridW, gridH)
-        vec[idx++] = safe(dist / maxDist)
-      }
-    }
-    // idx = 157
-
-    // --- Attack possible after move (4) ---  [157..160]
+    // --- Attack possible after move (4) ---  [148..151]
     for (let d = 0; d < 4; d++) {
       if (!moveValidity[d]) {
         vec[idx++] = 0
@@ -256,11 +228,11 @@ class GcFeatureBuilder {
         vec[idx++] = canAttack ? 1 : 0
       }
     }
-    // idx = 161
+    // idx = 152
 
-    // --- Can attack from current position (1) ---  [161]
+    // --- Can attack from current position (1) ---  [152]
     vec[idx++] = enemies.some(en => inRange(agent, en)) ? 1 : 0
-    // idx = 162
+    // idx = 153
 
     return vec
   }
@@ -340,31 +312,87 @@ function buildOccupiedSet(gameState, excludeSlot) {
   return occupied
 }
 
-function bfsDistance(sx, sy, tx, ty, terrain, gridW, gridH) {
-  if (sx === tx && sy === ty) return 0
+/**
+ * 8-directional ray-cast summary.
+ * For each of 8 directions: [wall_dist, nearest_enemy_dist, nearest_powerup_dist]
+ * Returns flat array of 24 values, all normalized to [0, 1].
+ */
+function buildDirectionalSummary(agent, enemies, powerups, terrain, gridW, gridH, maxDim) {
+  const result = new Array(24).fill(1.0)
 
-  const visited = new Set()
-  visited.add(`${sx},${sy}`)
-  const queue = [{ x: sx, y: sy, dist: 0 }]
-  let head = 0
+  // Assign entities to their closest octant
+  const enemyBuckets = new Array(8).fill(null)  // {dist} per direction
+  const puBuckets = new Array(8).fill(null)
 
-  while (head < queue.length) {
-    const { x, y, dist } = queue[head++]
-    for (const { dx, dy } of DIRECTIONS) {
-      const nx = x + dx
-      const ny = y + dy
-      if (nx === tx && ny === ty) return dist + 1
-      if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) continue
-      const t = getTerrain(terrain, nx, ny)
-      if (t === 1 || t === 2) continue
-      const key = `${nx},${ny}`
-      if (visited.has(key)) continue
-      visited.add(key)
-      queue.push({ x: nx, y: ny, dist: dist + 1 })
+  for (const en of enemies) {
+    const dirIdx = getOctant(agent.x, agent.y, en.x, en.y)
+    if (dirIdx < 0) continue
+    const dist = manhattan(agent, en)
+    if (!enemyBuckets[dirIdx] || dist < enemyBuckets[dirIdx]) {
+      enemyBuckets[dirIdx] = dist
     }
   }
 
-  return gridW + gridH  // unreachable
+  if (powerups?.length) {
+    for (const pu of powerups) {
+      const dirIdx = getOctant(agent.x, agent.y, pu.x, pu.y)
+      if (dirIdx < 0) continue
+      const dist = manhattan(agent, pu)
+      if (!puBuckets[dirIdx] || dist < puBuckets[dirIdx]) {
+        puBuckets[dirIdx] = dist
+      }
+    }
+  }
+
+  for (let d = 0; d < 8; d++) {
+    const base = d * 3
+    const { dx, dy } = DIRECTIONS_8[d]
+
+    // Ray-cast for wall distance
+    let wallDist = 0
+    let cx = agent.x + dx
+    let cy = agent.y + dy
+    while (cx >= 0 && cx < gridW && cy >= 0 && cy < gridH) {
+      const t = getTerrain(terrain, cx, cy)
+      if (t === 1 || t === 2) break
+      wallDist++
+      cx += dx
+      cy += dy
+    }
+    result[base] = safe(wallDist / maxDim)
+
+    // Nearest enemy in this octant
+    result[base + 1] = enemyBuckets[d] != null ? safe(enemyBuckets[d] / (maxDim * 2)) : 1.0
+
+    // Nearest powerup in this octant
+    result[base + 2] = puBuckets[d] != null ? safe(puBuckets[d] / (maxDim * 2)) : 1.0
+  }
+
+  return result
+}
+
+/**
+ * Get octant index (0-7) for direction from (ax,ay) to (bx,by).
+ * Returns -1 if same position.
+ * Octant order matches DIRECTIONS_8: up, down, left, right, up-left, up-right, down-left, down-right
+ */
+function getOctant(ax, ay, bx, by) {
+  const dx = bx - ax
+  const dy = by - ay
+  if (dx === 0 && dy === 0) return -1
+
+  const adx = Math.abs(dx)
+  const ady = Math.abs(dy)
+
+  // Cardinal dominance: if one axis is >= 2× the other, treat as cardinal
+  if (ady >= adx * 2) return dy < 0 ? 0 : 1       // up / down
+  if (adx >= ady * 2) return dx < 0 ? 2 : 3       // left / right
+
+  // Diagonal
+  if (dx < 0 && dy < 0) return 4   // up-left
+  if (dx > 0 && dy < 0) return 5   // up-right
+  if (dx < 0 && dy > 0) return 6   // down-left
+  return 7                          // down-right
 }
 
 module.exports = GcFeatureBuilder

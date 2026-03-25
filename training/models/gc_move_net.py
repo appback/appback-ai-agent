@@ -1,7 +1,7 @@
 """
 GC Move Network - Predicts optimal move direction from game state features.
 
-Input: 162-dim feature vector (featureBuilder v6.0)
+Input: 153-dim feature vector (featureBuilder v7.0)
 Output: 5 classes (stay, up, down, left, right)
 """
 
@@ -12,7 +12,7 @@ ACTION_LABELS = ['stay', 'up', 'down', 'left', 'right']
 
 
 class GcMoveNet(nn.Module):
-    def __init__(self, input_dim=162, hidden1=64, hidden2=32, output_dim=5):
+    def __init__(self, input_dim=153, hidden1=64, hidden2=32, output_dim=5):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden1),

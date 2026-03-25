@@ -95,13 +95,13 @@ def build_labels(sessions, ticks_df):
         f_cols = [c for c in ticks_df.columns if c.startswith("f")]
         features = row[f_cols].values.astype(np.float32)
 
-        if len(features) != 162:
+        if len(features) != 153:
             continue
 
-        # Stay boost: when attack is possible from current position (f161),
+        # Stay boost: when attack is possible from current position (f152),
         # boost "stay" weight and reduce movement weight.
         # Attack is automatic on server — staying in range = attacking.
-        can_attack = features[161] > 0.5
+        can_attack = features[152] > 0.5
         if can_attack:
             if label == 0:  # stay
                 reward *= 2.0
@@ -149,7 +149,7 @@ def train(X, y, w, epochs=50, batch_size=64, lr=0.001):
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size)
 
-    model = GcMoveNet(input_dim=162, output_dim=5)
+    model = GcMoveNet(input_dim=153, output_dim=5)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss(reduction="none")
 
@@ -201,7 +201,7 @@ def export_onnx(model, output_dir, val_acc):
     onnx_path = os.path.join(output_dir, "gc_move_model.onnx")
 
     model.eval()
-    dummy = torch.randn(1, 162)
+    dummy = torch.randn(1, 153)
     torch.onnx.export(
         model, dummy, onnx_path,
         input_names=["input"],
@@ -225,9 +225,9 @@ def export_onnx(model, output_dir, val_acc):
     meta = {
         "version": 1,
         "model": "gc_move_net",
-        "input_dim": 162,
+        "input_dim": 153,
         "output_dim": 5,
-        "feature_version": "6.0",
+        "feature_version": "7.0",
         "val_accuracy": round(val_acc, 4),
         "action_labels": ACTION_LABELS,
     }

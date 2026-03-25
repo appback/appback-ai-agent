@@ -51,7 +51,7 @@ class TrainingExporter {
       return sessionsPath
     }
 
-    // CSV header: session_id, tick, sub_tick, f0, f1, ..., f161, action, rank, score
+    // CSV header: session_id, tick, sub_tick, f0, f1, ..., f152, action, rank, score
     const firstFeatures = JSON.parse(ticks[0].my_features)
     const featureCount = firstFeatures.length
     const header = ['session_id', 'tick', 'sub_tick']

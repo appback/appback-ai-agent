@@ -98,9 +98,9 @@ class GcAdapter extends BaseGameAdapter {
       log.warn('Equipment load failed, using defaults', err.message)
     }
 
-    // Try loading ONNX models (v6.0: 162 dims, 5 classes)
+    // Try loading ONNX models (v7.0: 153 dims, 5 classes)
     if (this.modelRegistry) {
-      await this.modelRegistry.loadModel('gc', 'gc_strategy_model', { featureDim: 162 }).catch(() => {})
+      await this.modelRegistry.loadModel('gc', 'gc_strategy_model', { featureDim: 153 }).catch(() => {})
       this.modelRegistry.startWatcher()
     }
 
