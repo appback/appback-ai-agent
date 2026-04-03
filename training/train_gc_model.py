@@ -95,18 +95,8 @@ def build_labels(sessions, ticks_df):
         f_cols = [c for c in ticks_df.columns if c.startswith("f")]
         features = row[f_cols].values.astype(np.float32)
 
-        if len(features) != 153:
+        if len(features) < 153:
             continue
-
-        # Stay boost: when attack is possible from current position (f152),
-        # boost "stay" weight and reduce movement weight.
-        # Attack is automatic on server — staying in range = attacking.
-        can_attack = features[152] > 0.5
-        if can_attack:
-            if label == 0:  # stay
-                reward *= 2.0
-            else:  # moving away from attack range
-                reward *= 0.5
 
         features_list.append(features)
         labels_list.append(label)
@@ -149,7 +139,8 @@ def train(X, y, w, epochs=50, batch_size=64, lr=0.001):
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size)
 
-    model = GcMoveNet(input_dim=153, output_dim=5)
+    input_dim = X.shape[1]
+    model = GcMoveNet(input_dim=input_dim, output_dim=5)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss(reduction="none")
 
@@ -190,10 +181,10 @@ def train(X, y, w, epochs=50, batch_size=64, lr=0.001):
     if best_state:
         model.load_state_dict(best_state)
     print(f"Best validation accuracy: {best_val_acc:.4f}")
-    return model, best_val_acc
+    return model, best_val_acc, input_dim
 
 
-def export_onnx(model, output_dir, val_acc):
+def export_onnx(model, output_dir, val_acc, input_dim):
     """Export trained model to ONNX format (single file)."""
     import onnx
 
@@ -201,7 +192,7 @@ def export_onnx(model, output_dir, val_acc):
     onnx_path = os.path.join(output_dir, "gc_move_model.onnx")
 
     model.eval()
-    dummy = torch.randn(1, 153)
+    dummy = torch.randn(1, input_dim)
     torch.onnx.export(
         model, dummy, onnx_path,
         input_names=["input"],
@@ -225,7 +216,7 @@ def export_onnx(model, output_dir, val_acc):
     meta = {
         "version": 1,
         "model": "gc_move_net",
-        "input_dim": 153,
+        "input_dim": input_dim,
         "output_dim": 5,
         "feature_version": "7.0",
         "val_accuracy": round(val_acc, 4),
@@ -251,8 +242,8 @@ def main():
     print("=== GC Move Model Training ===")
     sessions, ticks_df = load_data(args.data_dir)
     X, y, w = build_labels(sessions, ticks_df)
-    model, val_acc = train(X, y, w, args.epochs, args.batch_size, args.lr)
-    export_onnx(model, args.output_dir, val_acc)
+    model, val_acc, input_dim = train(X, y, w, args.epochs, args.batch_size, args.lr)
+    export_onnx(model, args.output_dir, val_acc, input_dim)
     print("=== Training complete ===")
 
 
