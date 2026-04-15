@@ -516,14 +516,39 @@ class GcAdapter extends BaseGameAdapter {
 
     if (!enemies.length) return 'stay'
 
+    // If any enemy is in attack range, stay to auto-attack
+    const canAttack = enemies.some(en => {
+      const dist = Math.abs(en.x - me.x) + Math.abs(en.y - me.y)
+      const range = me.weapon?.range || 1
+      return dist >= 1 && dist <= range
+    })
+    if (canAttack) return 'stay'
+
     const target = enemies[0]
     const actionMask = this.featureBuilder.buildActionMask(me, gameState)
 
-    // Prefer moving toward target
+    // Check if moving in a direction puts us in attack range
+    const DIRS = [
+      null,
+      { dx: 0, dy: -1 },  // up
+      { dx: 0, dy: 1 },   // down
+      { dx: -1, dy: 0 },  // left
+      { dx: 1, dy: 0 },   // right
+    ]
+    for (let i = 1; i <= 4; i++) {
+      if (!actionMask[i]) continue
+      const nx = me.x + DIRS[i].dx
+      const ny = me.y + DIRS[i].dy
+      const distAfter = Math.abs(target.x - nx) + Math.abs(target.y - ny)
+      if (distAfter >= 1 && distAfter <= (me.weapon?.range || 1)) {
+        return ACTION_LABELS[i]
+      }
+    }
+
+    // Move toward target
     const dx = target.x - me.x
     const dy = target.y - me.y
 
-    // Direction preferences based on target position
     const prefs = []
     if (Math.abs(dx) >= Math.abs(dy)) {
       if (dx > 0) prefs.push(4) // right
