@@ -116,7 +116,13 @@ async function main() {
                 log.info(`Model uploaded to server: v${uploadResult.model_version}`)
               }
             } catch (err) {
-              log.warn(`Model upload failed (server may not support it yet): ${err.message}`)
+              const errData = err.response?.data
+              if (errData?.error === 'VERSION_OUTDATED') {
+                log.error(`[UPDATE REQUIRED] ${errData.message}`)
+                log.error('Run: npm install -g appback-ai-agent@latest')
+              } else {
+                log.warn(`Model upload failed: ${err.message}`)
+              }
             }
           }
         })
