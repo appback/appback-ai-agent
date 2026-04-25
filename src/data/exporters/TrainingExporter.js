@@ -52,8 +52,8 @@ class TrainingExporter {
     }
 
     // CSV header: session_id, tick, sub_tick, f0, f1, ..., f152, action, rank, score
-    const firstFeatures = JSON.parse(ticks[0].my_features)
-    const featureCount = firstFeatures.length
+    const lastFeatures = JSON.parse(ticks[ticks.length - 1].my_features)
+    const featureCount = lastFeatures.length
     const header = ['session_id', 'tick', 'sub_tick']
     for (let i = 0; i < featureCount; i++) header.push(`f${i}`)
     header.push('action', 'rank', 'score')
@@ -64,8 +64,10 @@ class TrainingExporter {
       let result
       try { result = JSON.parse(t.game_result) } catch { result = null }
       if (!result || typeof result !== 'object') continue
+      if (features.length !== featureCount) continue
       const decision = JSON.parse(t.my_decision || 'null')
-      const action = decision ? (decision.action || 'stay') : 'stay'
+      const action = decision?.action || ''
+      if (!action) continue
       const row = [t.session_id, t.tick, t.sub_tick]
       row.push(...features)
       row.push(action, result.rank || result.placement || 0, result.score || 0)

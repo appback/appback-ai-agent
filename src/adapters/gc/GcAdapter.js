@@ -427,6 +427,9 @@ class GcAdapter extends BaseGameAdapter {
       const tickState = { agents: agents.map(a => ({
         slot: a.slot, hp: a.hp, maxHp: a.maxHp, x: a.x, y: a.y,
         alive: a.alive, score: a.score,
+        weapon: a.weapon, weapon_range: a.weapon_range,
+        weapon_range_type: a.weapon_range_type, weapon_damage: a.weapon_damage,
+        armor: a.armor,
       })), shrinkPhase, eliminations }
 
       this.dataCollector.recordTick(

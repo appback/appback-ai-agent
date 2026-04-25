@@ -135,7 +135,9 @@ class GcFeatureBuilder {
     vec[idx++] = safe((agent.weapon?.range || 1) / 5)                              // 4
     vec[idx++] = safe((agent.weapon?.cooldown || 0) / 10)                          // 5
     vec[idx++] = safe((agent.effectiveSpeed || 100) / 120)                         // 6
-    vec[idx++] = safe((agent.effectiveSpeed || 100) / 120)                         // 7 (unified, same as 6)
+    // 7: self weapon rangeType — adjacent=0.0, pierce=0.5, ranged=1.0
+    const rt = agent.weapon?.rangeType || 'adjacent'
+    vec[idx++] = rt === 'ranged' ? 1.0 : (rt === 'pierce' ? 0.5 : 0.0)             // 7
     vec[idx++] = safe((agent.armor?.dmgReduction || 0) / 50)                       // 8
     vec[idx++] = safe((agent.armor?.evasion || 0) / 0.5)                           // 9
     vec[idx++] = safe((agent.score || 0) / 1000)                                   // 10
