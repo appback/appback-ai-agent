@@ -40,12 +40,15 @@
 - 설치: 글로벌 npm
 
 ### .21 — 운영 호스트 (192.168.0.21, DAONE-PC)
-- 환경: Windows 호스트 + WSL Ubuntu
-- 접속: SSH 미설정. 로컬 콘솔 직접 접근만 가능
+- 환경: Windows 호스트 + WSL Ubuntu (mirrored networking mode)
+- **원격 SSH 접근 불가** — Windows 방화벽 정책상 외부 인바운드 차단 (정책상 변경 안 함)
+- WSL 내부에서 SSH 서비스는 실행 중이고 공개키도 등록됨, 그러나 호스트 방화벽이 22번 차단
+- 운영 작업은 **DAONE-PC 로컬 콘솔 직접 접근** 필요:
+  - PowerShell에서 `wsl` 입력 → WSL Ubuntu 셸 진입
+  - WSL 셸 내부에서 작업 (PowerShell에서 sudo/apt 등 Linux 명령 실행 안 됨)
 - 계정: au212 (WSL 내부)
 - Node: v22.22.2 (nvm)
-- 설치: 글로벌 npm (WSL 내부)
-- **주의:** PowerShell이 아닌 **WSL Ubuntu 셸** 안에서 실행해야 함
+- 설치: 글로벌 npm
 
 ### .26 — 운영 호스트 (192.168.0.26, SQream 서버)
 - 접속: `ssh ospadmin@192.168.0.26`
