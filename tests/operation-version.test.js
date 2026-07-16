@@ -9,6 +9,7 @@ const { OperationVersionStore } = require('../src/config/OperationVersionStore')
 const {
   CURRENT_OPERATION_CONTRACT,
   V8_OPERATION_CONTRACT,
+  V81_OPERATION_CONTRACT,
 } = require('../src/config/operationContract')
 const SqliteStore = require('../src/data/storage/SqliteStore')
 const TrainingExporter = require('../src/data/exporters/TrainingExporter')
@@ -79,6 +80,22 @@ test('operation CLI explicitly activates v8 without changing the default v7 cont
   assert.equal(shown.status, 0, shown.stderr)
   assert.match(shown.stdout, /Binary operation: gc-v8-r1/)
   assert.match(shown.stdout, /Status: compatible/)
+})
+
+test('operation CLI activates the isolated v8.1 strategy contract by explicit name', () => {
+  const dir = tempDir()
+  const cli = path.join(__dirname, '..', 'bin', 'cli.js')
+  const activated = spawnSync(process.execPath, [cli, 'operation', 'activate', 'v81', '--yes'], {
+    cwd: dir,
+    encoding: 'utf8',
+  })
+  assert.equal(activated.status, 0, activated.stderr)
+  assert.match(activated.stdout, /Active operation: gc-v8-strategy-r1/)
+  assert.match(activated.stdout, /v8\.1 \/ 214 dimensions/)
+  const stored = JSON.parse(fs.readFileSync(path.join(dir, 'config', 'operation.json'), 'utf8'))
+  assert.equal(stored.feature_schema_hash, V81_OPERATION_CONTRACT.feature_schema_hash)
+  assert.deepEqual(stored.strategy_labels, V81_OPERATION_CONTRACT.strategy_labels)
+  assert.equal(new OperationVersionStore(path.join(dir, 'config')).getStatus().compatible, true)
 })
 
 test('session counts and exports exclude legacy and other-profile data', () => {

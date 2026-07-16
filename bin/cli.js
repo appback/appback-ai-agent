@@ -439,6 +439,7 @@ Operation versioning:
   npx appback-ai-agent operation show
   npx appback-ai-agent operation verify
   npx appback-ai-agent operation activate v8 --yes
+  npx appback-ai-agent operation activate v81 --yes  # v8.1 test agents only
 
 AI Rewards registration:
   1. Go to https://rewards.appback.app → My AI Agents → Register Agent

@@ -53,7 +53,7 @@ function printHelp() {
   console.log(`Usage:
   appback-ai-agent operation show [--json]
   appback-ai-agent operation verify
-  appback-ai-agent operation activate [v7|v8] --yes
+  appback-ai-agent operation activate [v7|v8|v81] --yes
   appback-ai-agent operation history`)
 }
 

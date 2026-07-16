@@ -1,4 +1,5 @@
 const crypto = require('crypto')
+const { SCHEMA_HASH: V81_SCHEMA_HASH, STRATEGY_LABELS } = require('./gcStrategyV81Contract')
 
 const V7_OPERATION_CONTRACT = Object.freeze({
   schema_version: 1,
@@ -22,9 +23,22 @@ const V8_OPERATION_CONTRACT = Object.freeze({
   output_dim: 5,
 })
 
+const V81_OPERATION_CONTRACT = Object.freeze({
+  schema_version: 1,
+  operation_version: 'gc-v8-strategy-r1',
+  feature_version: '8.1',
+  feature_dim: 214,
+  feature_schema_id: 'gc-strategy-v8-214-r1',
+  feature_schema_hash: V81_SCHEMA_HASH,
+  training_version: 'teacher-strategy-v8-r1',
+  output_dim: 11,
+  strategy_labels: STRATEGY_LABELS,
+})
+
 const OPERATION_CONTRACTS = Object.freeze({
   v7: V7_OPERATION_CONTRACT,
   v8: V8_OPERATION_CONTRACT,
+  v81: V81_OPERATION_CONTRACT,
 })
 const CURRENT_OPERATION_CONTRACT = V7_OPERATION_CONTRACT
 
@@ -35,14 +49,27 @@ function schemaHash(schemaId) {
 function contractsEqual(left, right) {
   if (!left || !right) return false
   return Object.keys(right)
-    .every(key => left[key] === right[key])
+    .every(key => contractValueEqual(left[key], right[key]))
+}
+
+function contractValueEqual(left, right) {
+  if (left === right) return true
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length && left.every((value, index) => contractValueEqual(value, right[index]))
+  }
+  if (left && right && typeof left === 'object' && typeof right === 'object') {
+    const leftKeys = Object.keys(left).sort()
+    const rightKeys = Object.keys(right).sort()
+    return contractValueEqual(leftKeys, rightKeys) && leftKeys.every(key => contractValueEqual(left[key], right[key]))
+  }
+  return false
 }
 
 function getOperationContract(nameOrVersion) {
   const requested = String(nameOrVersion || '').trim().toLowerCase()
   if (OPERATION_CONTRACTS[requested]) return OPERATION_CONTRACTS[requested]
   return Object.values(OPERATION_CONTRACTS)
-    .find(contract => contract.operation_version.toLowerCase() === requested) || null
+    .find(contract => contract.operation_version.toLowerCase() === requested || contract.feature_version === requested) || null
 }
 
 function safeSegment(value) {
@@ -69,6 +96,7 @@ module.exports = {
   OPERATION_CONTRACTS,
   V7_OPERATION_CONTRACT,
   V8_OPERATION_CONTRACT,
+  V81_OPERATION_CONTRACT,
   buildRuntimeContext,
   contractsEqual,
   getOperationContract,

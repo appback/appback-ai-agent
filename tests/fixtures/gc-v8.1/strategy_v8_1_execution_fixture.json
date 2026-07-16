@@ -1,0 +1,89 @@
+{
+  "schema_id": "gc-strategy-v8-214-r1",
+  "cases": [
+    {
+      "name": "hold_has_no_move_or_attack",
+      "game": {"grid_width": 3, "grid_height": 3, "terrain": [[0,0,0],[0,0,0],[0,0,0]]},
+      "self_index": 0,
+      "strategy": "hold",
+      "agents": [
+        {"slot": 1, "x": 1, "y": 1, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1},
+        {"slot": 0, "x": 1, "y": 2, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1}
+      ],
+      "expected": {"executed_strategy": "hold", "path_action": "stay", "movement_action": "stay", "selected_target_slot": -1, "executed_target_slot": -1, "goal": [1,1]}
+    },
+    {
+      "name": "maze_attack_uses_udlr_bfs",
+      "game": {"grid_width": 5, "grid_height": 5, "terrain": [[0,1,0,0,0],[0,1,0,1,0],[0,0,0,1,0],[1,1,0,1,0],[0,0,0,0,0]]},
+      "self_index": 0,
+      "strategy": "attack_candidate_0",
+      "agents": [
+        {"slot": 0, "x": 0, "y": 0, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1},
+        {"slot": 1, "x": 4, "y": 0, "hp": 100, "max_hp": 100, "alive": true, "weapon": "hammer", "range_type": "adjacent", "damage_min": 10, "damage_max": 12, "range": 1}
+      ],
+      "expected": {"executed_strategy": "attack_candidate_0", "path_action": "down", "movement_action": "down", "selected_target_slot": 1, "executed_target_slot": -1, "goal": [3,0]}
+    },
+    {
+      "name": "dead_target_falls_back_by_candidate_index",
+      "game": {"grid_width": 3, "grid_height": 3, "terrain": [[0,0,0],[0,0,0],[0,0,0]]},
+      "self_index": 0,
+      "strategy": "attack_candidate_0",
+      "agents": [
+        {"slot": 1, "x": 1, "y": 1, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1},
+        {"slot": 0, "x": 1, "y": 2, "hp": 20, "max_hp": 100, "alive": true, "weapon": "dagger", "range_type": "adjacent", "damage_min": 6, "damage_max": 8, "range": 1},
+        {"slot": 2, "x": 2, "y": 1, "hp": 80, "max_hp": 100, "alive": true, "weapon": "hammer", "range_type": "adjacent", "damage_min": 10, "damage_max": 12, "range": 1}
+      ],
+      "mutation": {"dead_slot": 0, "revalidate": true},
+      "expected": {"executed_strategy": "attack_candidate_1", "path_action": "stay", "movement_action": "stay", "selected_target_slot": 0, "executed_target_slot": 2, "strategy_override_reason": "target_dead", "goal": [1,1]}
+    },
+    {
+      "name": "unreachable_target_becomes_hold",
+      "game": {"grid_width": 3, "grid_height": 3, "terrain": [[0,0,0],[0,0,0],[0,0,0]]},
+      "self_index": 0,
+      "strategy": "attack_candidate_0",
+      "agents": [
+        {"slot": 0, "x": 0, "y": 0, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1},
+        {"slot": 1, "x": 2, "y": 2, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1}
+      ],
+      "mutation": {"terrain": [[0,1,0],[1,1,0],[0,0,0]], "revalidate": true},
+      "expected": {"executed_strategy": "hold", "path_action": "stay", "movement_action": "stay", "selected_target_slot": 1, "executed_target_slot": -1, "strategy_override_reason": "target_unreachable", "goal": [0,0]}
+    },
+    {
+      "name": "dynamic_collision_cancels_only_movement",
+      "game": {"grid_width": 4, "grid_height": 3, "terrain": [[0,0,0,0],[0,0,0,0],[0,0,0,0]]},
+      "self_index": 0,
+      "strategy": "attack_candidate_1",
+      "agents": [
+        {"slot": 0, "x": 0, "y": 1, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1},
+        {"slot": 1, "x": 2, "y": 2, "hp": 100, "max_hp": 100, "alive": true, "weapon": "dagger", "range_type": "adjacent", "damage_min": 6, "damage_max": 8, "range": 1},
+        {"slot": 2, "x": 3, "y": 1, "hp": 100, "max_hp": 100, "alive": true, "weapon": "hammer", "range_type": "adjacent", "damage_min": 10, "damage_max": 12, "range": 1}
+      ],
+      "mutation": {"move_slot": 1, "move_x": 1, "move_y": 1},
+      "expected": {"executed_strategy": "attack_candidate_1", "path_action": "right", "movement_action": "stay", "selected_target_slot": 2, "executed_target_slot": -1, "movement_override_reason": "dynamic_collision", "goal": [2,1]}
+    },
+    {
+      "name": "blocked_final_step_records_target_not_in_range",
+      "game": {"grid_width": 4, "grid_height": 3, "terrain": [[0,0,0,0],[0,0,0,0],[0,0,0,0]]},
+      "self_index": 0,
+      "strategy": "attack_candidate_0",
+      "agents": [
+        {"slot": 0, "x": 0, "y": 1, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1},
+        {"slot": 1, "x": 2, "y": 1, "hp": 100, "max_hp": 100, "alive": true, "weapon": "dagger", "range_type": "adjacent", "damage_min": 6, "damage_max": 8, "range": 1},
+        {"slot": 2, "x": 3, "y": 2, "hp": 100, "max_hp": 100, "alive": true, "weapon": "hammer", "range_type": "adjacent", "damage_min": 10, "damage_max": 12, "range": 1}
+      ],
+      "mutation": {"move_slot": 2, "move_x": 1, "move_y": 1},
+      "expected": {"executed_strategy": "attack_candidate_0", "path_action": "right", "movement_action": "stay", "selected_target_slot": 1, "executed_target_slot": 2, "strategy_override_reason": "target_not_in_range_after_move", "movement_override_reason": "dynamic_collision", "goal": [1,1]}
+    },
+    {
+      "name": "flee_prefers_lower_threat_then_distance",
+      "game": {"grid_width": 5, "grid_height": 5, "terrain": [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]},
+      "self_index": 0,
+      "strategy": "flee",
+      "agents": [
+        {"slot": 0, "x": 2, "y": 2, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1},
+        {"slot": 1, "x": 2, "y": 1, "hp": 100, "max_hp": 100, "alive": true, "weapon": "sword", "range_type": "adjacent", "damage_min": 8, "damage_max": 10, "range": 1}
+      ],
+      "expected": {"executed_strategy": "flee", "path_action": "down", "movement_action": "down", "selected_target_slot": -1, "executed_target_slot": -1, "goal": [0,4]}
+    }
+  ]
+}

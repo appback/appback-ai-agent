@@ -50,7 +50,7 @@ async function main() {
   const modelRelativePath = path.relative(path.join(modelDir, 'gc'), path.join(modelGenerationDir, 'gc_move_model.onnx'))
   const autoTrainAfter = parseInt(process.env.AUTO_TRAIN_AFTER_GAMES || '50')
   const healthPort = parseInt(process.env.HEALTH_PORT || '9090')
-  const trainingSyncEnabled = runtimeContext.feature_version === '8.0' &&
+  const trainingSyncEnabled = runtimeContext.feature_version.startsWith('8.') &&
     parseBoolean(process.env.GC_TRAINING_SYNC_ENABLED, true)
   const trainingSyncInterval = parseInt(process.env.GC_TRAINING_SYNC_INTERVAL_SEC || '30')
 
@@ -132,7 +132,7 @@ async function main() {
     log.info(`Game completed: ${game} / ${gameId}`)
 
     // v8 training uses the authoritative GC feed, never the legacy viewer snapshots.
-    if (runtimeContext.feature_version === '8.0') return
+    if (runtimeContext.feature_version.startsWith('8.')) return
 
     const totalGames = dataCollector.getSessionCount(game)
 

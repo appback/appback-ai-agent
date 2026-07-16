@@ -17,7 +17,10 @@ function adapter(featureVersion, behaviorProfile = PROFILE) {
       startSession() { sessions++; return 1 },
     },
     eventBus: { emit() {} },
-    runtimeContext: { feature_version: featureVersion, feature_dim: featureVersion === '8.0' ? 192 : 153 },
+    runtimeContext: {
+      feature_version: featureVersion,
+      feature_dim: featureVersion === '8.1' ? 214 : featureVersion === '8.0' ? 192 : 153,
+    },
     agentVersion: '2.2.1',
     behaviorProfile,
   })
@@ -36,6 +39,11 @@ test('v8 operation never starts the legacy viewer training session', async () =>
   await v7.instance._enterGame('game-v7', 1)
   assert.equal(v7.sessionCount(), 1)
   assert.equal(v7.instance.sessionId, 1)
+
+  const v81 = adapter('8.1')
+  await v81.instance._enterGame('game-v81', 2)
+  assert.equal(v81.sessionCount(), 0)
+  assert.equal(v81.instance.sessionId, null)
 })
 
 test('loadout profile context is gated by the server capability', async () => {

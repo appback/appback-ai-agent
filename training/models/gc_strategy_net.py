@@ -1,25 +1,31 @@
 """
 GC Strategy Network - Predicts optimal strategy from game state features.
 
-Input: 153-dim move feature vector (same as featureBuilder v7.0)
-Output: 7 classes (3 modes × 2 target priorities + 1 flee flag)
-
-Simplified output mapping:
-  0: aggressive + nearest
-  1: aggressive + lowest_hp
-  2: balanced + nearest
-  3: balanced + lowest_hp
-  4: defensive + nearest
-  5: defensive + lowest_hp
-  6: flee (defensive + high flee_threshold)
+Input: GC canonical strategy v8.1 float32[214]
+Output: 11 strategy classes in the immutable server contract order.
 """
 
 import torch
 import torch.nn as nn
 
 
+STRATEGY_LABELS = [
+    "hold",
+    "flee",
+    "seek_powerup",
+    "explore",
+    "attack_candidate_0",
+    "attack_candidate_1",
+    "attack_candidate_2",
+    "attack_candidate_3",
+    "attack_candidate_4",
+    "attack_candidate_5",
+    "attack_candidate_6",
+]
+
+
 class GcStrategyNet(nn.Module):
-    def __init__(self, input_dim=153, hidden1=64, hidden2=32, output_dim=7):
+    def __init__(self, input_dim=214, hidden1=128, hidden2=64, output_dim=11):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden1),
@@ -33,14 +39,3 @@ class GcStrategyNet(nn.Module):
 
     def forward(self, x):
         return self.net(x)
-
-
-STRATEGY_MAP = [
-    {"mode": "aggressive", "target_priority": "nearest", "flee_threshold": 10},
-    {"mode": "aggressive", "target_priority": "lowest_hp", "flee_threshold": 10},
-    {"mode": "balanced", "target_priority": "nearest", "flee_threshold": 15},
-    {"mode": "balanced", "target_priority": "lowest_hp", "flee_threshold": 15},
-    {"mode": "defensive", "target_priority": "nearest", "flee_threshold": 20},
-    {"mode": "defensive", "target_priority": "lowest_hp", "flee_threshold": 20},
-    {"mode": "defensive", "target_priority": "nearest", "flee_threshold": 30},
-]

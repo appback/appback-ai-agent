@@ -1,0 +1,1161 @@
+{
+  "schema_id": "gc-strategy-v8-214-r1",
+  "feature_version": "8.1",
+  "feature_dim": 214,
+  "output_dim": 11,
+  "strategy_labels": [
+    "hold",
+    "flee",
+    "seek_powerup",
+    "explore",
+    "attack_candidate_0",
+    "attack_candidate_1",
+    "attack_candidate_2",
+    "attack_candidate_3",
+    "attack_candidate_4",
+    "attack_candidate_5",
+    "attack_candidate_6"
+  ],
+  "value_type": "float32",
+  "non_finite_default": 0,
+  "clamp": [
+    -1,
+    1
+  ],
+  "direction_order": [
+    "up",
+    "down",
+    "left",
+    "right"
+  ],
+  "bfs_neighbor_order": [
+    "up",
+    "down",
+    "left",
+    "right"
+  ],
+  "candidate_order_rule": "agent-local session map: exclude self, sort slot ascending, max 7, never compact",
+  "octant_rule": "cardinal iff dx=0 or dy=0; otherwise sign(dx),sign(dy) selects diagonal; same position absent",
+  "hash_rule": "sha256 of raw UTF-8 bytes with LF, trailing LF, and no BOM",
+  "octant_order": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "up_left",
+    "up_right",
+    "down_left",
+    "down_right"
+  ],
+  "weapon_order": [
+    "sword",
+    "dagger",
+    "hammer",
+    "bow",
+    "spear"
+  ],
+  "blocks": [
+    {
+      "name": "self_game_loadout",
+      "start": 0,
+      "end": 25,
+      "dimension": 26
+    },
+    {
+      "name": "enemy_candidates",
+      "start": 26,
+      "end": 137,
+      "dimension": 112
+    },
+    {
+      "name": "arena_directional",
+      "start": 138,
+      "end": 172,
+      "dimension": 35
+    },
+    {
+      "name": "temporal_navigation",
+      "start": 173,
+      "end": 193,
+      "dimension": 21
+    },
+    {
+      "name": "strategy_feasibility",
+      "start": 194,
+      "end": 213,
+      "dimension": 20
+    }
+  ],
+  "features": [
+    {
+      "index": 0,
+      "name": "self.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 1,
+      "name": "self.x_ratio",
+      "formula": "X / max(1, width)"
+    },
+    {
+      "index": 2,
+      "name": "self.y_ratio",
+      "formula": "Y / max(1, height)"
+    },
+    {
+      "index": 3,
+      "name": "self.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 4,
+      "name": "self.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 5,
+      "name": "self.armor_reduction_ratio",
+      "formula": "ArmorReduction / 20"
+    },
+    {
+      "index": 6,
+      "name": "self.bonus_defense_ratio",
+      "formula": "BonusDefense / 20"
+    },
+    {
+      "index": 7,
+      "name": "self.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 8,
+      "name": "self.effective_speed_ratio",
+      "formula": "Speed / 120"
+    },
+    {
+      "index": 9,
+      "name": "self.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 10,
+      "name": "self.score_ratio",
+      "formula": "Score / 1000"
+    },
+    {
+      "index": 11,
+      "name": "self.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 12,
+      "name": "self.damage_taken_ratio",
+      "formula": "DamageTaken / 1000"
+    },
+    {
+      "index": 13,
+      "name": "self.damage_dealt_ratio",
+      "formula": "DamageDealt / 1000"
+    },
+    {
+      "index": 14,
+      "name": "self.survived_ticks_ratio",
+      "formula": "SurvivedTicks / max(1, max_ticks)"
+    },
+    {
+      "index": 15,
+      "name": "self.alive",
+      "formula": "bool(Alive)"
+    },
+    {
+      "index": 16,
+      "name": "self.weapon_sword",
+      "formula": "bool(Weapon == sword)"
+    },
+    {
+      "index": 17,
+      "name": "self.weapon_dagger",
+      "formula": "bool(Weapon == dagger)"
+    },
+    {
+      "index": 18,
+      "name": "self.weapon_hammer",
+      "formula": "bool(Weapon == hammer)"
+    },
+    {
+      "index": 19,
+      "name": "self.weapon_bow",
+      "formula": "bool(Weapon == bow)"
+    },
+    {
+      "index": 20,
+      "name": "self.weapon_spear",
+      "formula": "bool(Weapon == spear)"
+    },
+    {
+      "index": 21,
+      "name": "self.range_type_adjacent",
+      "formula": "bool(RangeType == adjacent || RangeType == empty)"
+    },
+    {
+      "index": 22,
+      "name": "self.range_type_ranged",
+      "formula": "bool(RangeType == ranged)"
+    },
+    {
+      "index": 23,
+      "name": "self.range_type_pierce",
+      "formula": "bool(RangeType == pierce)"
+    },
+    {
+      "index": 24,
+      "name": "game.alive_enemy_ratio",
+      "formula": "alive enemies / 7"
+    },
+    {
+      "index": 25,
+      "name": "game.tick_ratio",
+      "formula": "tick / max(1, max_ticks)"
+    },
+    {
+      "index": 26,
+      "name": "candidate0.available_alive",
+      "formula": "bool(assigned && Alive)"
+    },
+    {
+      "index": 27,
+      "name": "candidate0.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 28,
+      "name": "candidate0.dx_ratio",
+      "formula": "(X - self.X) / max(1, width)"
+    },
+    {
+      "index": 29,
+      "name": "candidate0.dy_ratio",
+      "formula": "(Y - self.Y) / max(1, height)"
+    },
+    {
+      "index": 30,
+      "name": "candidate0.manhattan_ratio",
+      "formula": "Manhattan(self, candidate) / max_path"
+    },
+    {
+      "index": 31,
+      "name": "candidate0.bfs_attack_path_ratio",
+      "formula": "shortest attack path / max_path; unreachable=1"
+    },
+    {
+      "index": 32,
+      "name": "candidate0.reachable",
+      "formula": "bool(shortest attack path exists)"
+    },
+    {
+      "index": 33,
+      "name": "candidate0.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 34,
+      "name": "candidate0.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 35,
+      "name": "candidate0.defense_ratio",
+      "formula": "(ArmorReduction + BonusDefense) / 20"
+    },
+    {
+      "index": 36,
+      "name": "candidate0.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 37,
+      "name": "candidate0.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 38,
+      "name": "candidate0.can_hit_self",
+      "formula": "bool(candidate can primary-hit self now)"
+    },
+    {
+      "index": 39,
+      "name": "candidate0.self_can_hit",
+      "formula": "bool(self can primary-hit candidate now)"
+    },
+    {
+      "index": 40,
+      "name": "candidate0.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 41,
+      "name": "candidate0.weapon_tactical_code",
+      "formula": "unknown=0,sword=.2,dagger=.4,hammer=.6,bow=.8,spear=1"
+    },
+    {
+      "index": 42,
+      "name": "candidate1.available_alive",
+      "formula": "bool(assigned && Alive)"
+    },
+    {
+      "index": 43,
+      "name": "candidate1.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 44,
+      "name": "candidate1.dx_ratio",
+      "formula": "(X - self.X) / max(1, width)"
+    },
+    {
+      "index": 45,
+      "name": "candidate1.dy_ratio",
+      "formula": "(Y - self.Y) / max(1, height)"
+    },
+    {
+      "index": 46,
+      "name": "candidate1.manhattan_ratio",
+      "formula": "Manhattan(self, candidate) / max_path"
+    },
+    {
+      "index": 47,
+      "name": "candidate1.bfs_attack_path_ratio",
+      "formula": "shortest attack path / max_path; unreachable=1"
+    },
+    {
+      "index": 48,
+      "name": "candidate1.reachable",
+      "formula": "bool(shortest attack path exists)"
+    },
+    {
+      "index": 49,
+      "name": "candidate1.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 50,
+      "name": "candidate1.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 51,
+      "name": "candidate1.defense_ratio",
+      "formula": "(ArmorReduction + BonusDefense) / 20"
+    },
+    {
+      "index": 52,
+      "name": "candidate1.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 53,
+      "name": "candidate1.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 54,
+      "name": "candidate1.can_hit_self",
+      "formula": "bool(candidate can primary-hit self now)"
+    },
+    {
+      "index": 55,
+      "name": "candidate1.self_can_hit",
+      "formula": "bool(self can primary-hit candidate now)"
+    },
+    {
+      "index": 56,
+      "name": "candidate1.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 57,
+      "name": "candidate1.weapon_tactical_code",
+      "formula": "unknown=0,sword=.2,dagger=.4,hammer=.6,bow=.8,spear=1"
+    },
+    {
+      "index": 58,
+      "name": "candidate2.available_alive",
+      "formula": "bool(assigned && Alive)"
+    },
+    {
+      "index": 59,
+      "name": "candidate2.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 60,
+      "name": "candidate2.dx_ratio",
+      "formula": "(X - self.X) / max(1, width)"
+    },
+    {
+      "index": 61,
+      "name": "candidate2.dy_ratio",
+      "formula": "(Y - self.Y) / max(1, height)"
+    },
+    {
+      "index": 62,
+      "name": "candidate2.manhattan_ratio",
+      "formula": "Manhattan(self, candidate) / max_path"
+    },
+    {
+      "index": 63,
+      "name": "candidate2.bfs_attack_path_ratio",
+      "formula": "shortest attack path / max_path; unreachable=1"
+    },
+    {
+      "index": 64,
+      "name": "candidate2.reachable",
+      "formula": "bool(shortest attack path exists)"
+    },
+    {
+      "index": 65,
+      "name": "candidate2.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 66,
+      "name": "candidate2.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 67,
+      "name": "candidate2.defense_ratio",
+      "formula": "(ArmorReduction + BonusDefense) / 20"
+    },
+    {
+      "index": 68,
+      "name": "candidate2.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 69,
+      "name": "candidate2.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 70,
+      "name": "candidate2.can_hit_self",
+      "formula": "bool(candidate can primary-hit self now)"
+    },
+    {
+      "index": 71,
+      "name": "candidate2.self_can_hit",
+      "formula": "bool(self can primary-hit candidate now)"
+    },
+    {
+      "index": 72,
+      "name": "candidate2.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 73,
+      "name": "candidate2.weapon_tactical_code",
+      "formula": "unknown=0,sword=.2,dagger=.4,hammer=.6,bow=.8,spear=1"
+    },
+    {
+      "index": 74,
+      "name": "candidate3.available_alive",
+      "formula": "bool(assigned && Alive)"
+    },
+    {
+      "index": 75,
+      "name": "candidate3.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 76,
+      "name": "candidate3.dx_ratio",
+      "formula": "(X - self.X) / max(1, width)"
+    },
+    {
+      "index": 77,
+      "name": "candidate3.dy_ratio",
+      "formula": "(Y - self.Y) / max(1, height)"
+    },
+    {
+      "index": 78,
+      "name": "candidate3.manhattan_ratio",
+      "formula": "Manhattan(self, candidate) / max_path"
+    },
+    {
+      "index": 79,
+      "name": "candidate3.bfs_attack_path_ratio",
+      "formula": "shortest attack path / max_path; unreachable=1"
+    },
+    {
+      "index": 80,
+      "name": "candidate3.reachable",
+      "formula": "bool(shortest attack path exists)"
+    },
+    {
+      "index": 81,
+      "name": "candidate3.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 82,
+      "name": "candidate3.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 83,
+      "name": "candidate3.defense_ratio",
+      "formula": "(ArmorReduction + BonusDefense) / 20"
+    },
+    {
+      "index": 84,
+      "name": "candidate3.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 85,
+      "name": "candidate3.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 86,
+      "name": "candidate3.can_hit_self",
+      "formula": "bool(candidate can primary-hit self now)"
+    },
+    {
+      "index": 87,
+      "name": "candidate3.self_can_hit",
+      "formula": "bool(self can primary-hit candidate now)"
+    },
+    {
+      "index": 88,
+      "name": "candidate3.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 89,
+      "name": "candidate3.weapon_tactical_code",
+      "formula": "unknown=0,sword=.2,dagger=.4,hammer=.6,bow=.8,spear=1"
+    },
+    {
+      "index": 90,
+      "name": "candidate4.available_alive",
+      "formula": "bool(assigned && Alive)"
+    },
+    {
+      "index": 91,
+      "name": "candidate4.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 92,
+      "name": "candidate4.dx_ratio",
+      "formula": "(X - self.X) / max(1, width)"
+    },
+    {
+      "index": 93,
+      "name": "candidate4.dy_ratio",
+      "formula": "(Y - self.Y) / max(1, height)"
+    },
+    {
+      "index": 94,
+      "name": "candidate4.manhattan_ratio",
+      "formula": "Manhattan(self, candidate) / max_path"
+    },
+    {
+      "index": 95,
+      "name": "candidate4.bfs_attack_path_ratio",
+      "formula": "shortest attack path / max_path; unreachable=1"
+    },
+    {
+      "index": 96,
+      "name": "candidate4.reachable",
+      "formula": "bool(shortest attack path exists)"
+    },
+    {
+      "index": 97,
+      "name": "candidate4.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 98,
+      "name": "candidate4.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 99,
+      "name": "candidate4.defense_ratio",
+      "formula": "(ArmorReduction + BonusDefense) / 20"
+    },
+    {
+      "index": 100,
+      "name": "candidate4.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 101,
+      "name": "candidate4.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 102,
+      "name": "candidate4.can_hit_self",
+      "formula": "bool(candidate can primary-hit self now)"
+    },
+    {
+      "index": 103,
+      "name": "candidate4.self_can_hit",
+      "formula": "bool(self can primary-hit candidate now)"
+    },
+    {
+      "index": 104,
+      "name": "candidate4.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 105,
+      "name": "candidate4.weapon_tactical_code",
+      "formula": "unknown=0,sword=.2,dagger=.4,hammer=.6,bow=.8,spear=1"
+    },
+    {
+      "index": 106,
+      "name": "candidate5.available_alive",
+      "formula": "bool(assigned && Alive)"
+    },
+    {
+      "index": 107,
+      "name": "candidate5.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 108,
+      "name": "candidate5.dx_ratio",
+      "formula": "(X - self.X) / max(1, width)"
+    },
+    {
+      "index": 109,
+      "name": "candidate5.dy_ratio",
+      "formula": "(Y - self.Y) / max(1, height)"
+    },
+    {
+      "index": 110,
+      "name": "candidate5.manhattan_ratio",
+      "formula": "Manhattan(self, candidate) / max_path"
+    },
+    {
+      "index": 111,
+      "name": "candidate5.bfs_attack_path_ratio",
+      "formula": "shortest attack path / max_path; unreachable=1"
+    },
+    {
+      "index": 112,
+      "name": "candidate5.reachable",
+      "formula": "bool(shortest attack path exists)"
+    },
+    {
+      "index": 113,
+      "name": "candidate5.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 114,
+      "name": "candidate5.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 115,
+      "name": "candidate5.defense_ratio",
+      "formula": "(ArmorReduction + BonusDefense) / 20"
+    },
+    {
+      "index": 116,
+      "name": "candidate5.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 117,
+      "name": "candidate5.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 118,
+      "name": "candidate5.can_hit_self",
+      "formula": "bool(candidate can primary-hit self now)"
+    },
+    {
+      "index": 119,
+      "name": "candidate5.self_can_hit",
+      "formula": "bool(self can primary-hit candidate now)"
+    },
+    {
+      "index": 120,
+      "name": "candidate5.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 121,
+      "name": "candidate5.weapon_tactical_code",
+      "formula": "unknown=0,sword=.2,dagger=.4,hammer=.6,bow=.8,spear=1"
+    },
+    {
+      "index": 122,
+      "name": "candidate6.available_alive",
+      "formula": "bool(assigned && Alive)"
+    },
+    {
+      "index": 123,
+      "name": "candidate6.hp_ratio",
+      "formula": "HP / max(1, MaxHP)"
+    },
+    {
+      "index": 124,
+      "name": "candidate6.dx_ratio",
+      "formula": "(X - self.X) / max(1, width)"
+    },
+    {
+      "index": 125,
+      "name": "candidate6.dy_ratio",
+      "formula": "(Y - self.Y) / max(1, height)"
+    },
+    {
+      "index": 126,
+      "name": "candidate6.manhattan_ratio",
+      "formula": "Manhattan(self, candidate) / max_path"
+    },
+    {
+      "index": 127,
+      "name": "candidate6.bfs_attack_path_ratio",
+      "formula": "shortest attack path / max_path; unreachable=1"
+    },
+    {
+      "index": 128,
+      "name": "candidate6.reachable",
+      "formula": "bool(shortest attack path exists)"
+    },
+    {
+      "index": 129,
+      "name": "candidate6.damage_ratio",
+      "formula": "((DamageMin + DamageMax) / 2) / 20"
+    },
+    {
+      "index": 130,
+      "name": "candidate6.range_ratio",
+      "formula": "Range / 5"
+    },
+    {
+      "index": 131,
+      "name": "candidate6.defense_ratio",
+      "formula": "(ArmorReduction + BonusDefense) / 20"
+    },
+    {
+      "index": 132,
+      "name": "candidate6.evasion_ratio",
+      "formula": "Evasion / 0.5"
+    },
+    {
+      "index": 133,
+      "name": "candidate6.action_readiness",
+      "formula": "ActionAcc / 100"
+    },
+    {
+      "index": 134,
+      "name": "candidate6.can_hit_self",
+      "formula": "bool(candidate can primary-hit self now)"
+    },
+    {
+      "index": 135,
+      "name": "candidate6.self_can_hit",
+      "formula": "bool(self can primary-hit candidate now)"
+    },
+    {
+      "index": 136,
+      "name": "candidate6.kills_ratio",
+      "formula": "Kills / 7"
+    },
+    {
+      "index": 137,
+      "name": "candidate6.weapon_tactical_code",
+      "formula": "unknown=0,sword=.2,dagger=.4,hammer=.6,bow=.8,spear=1"
+    },
+    {
+      "index": 138,
+      "name": "arena.shrink_phase_ratio",
+      "formula": "capability=false => 0"
+    },
+    {
+      "index": 139,
+      "name": "arena.living_agent_ratio",
+      "formula": "living agents / 8"
+    },
+    {
+      "index": 140,
+      "name": "arena.nearest_powerup_path_ratio",
+      "formula": "capability=false or absent => 1"
+    },
+    {
+      "index": 141,
+      "name": "arena.safe_zone_path_ratio",
+      "formula": "capability=false or absent => 1"
+    },
+    {
+      "index": 142,
+      "name": "direction.up.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 143,
+      "name": "direction.up.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 144,
+      "name": "direction.up.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 145,
+      "name": "direction.down.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 146,
+      "name": "direction.down.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 147,
+      "name": "direction.down.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 148,
+      "name": "direction.left.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 149,
+      "name": "direction.left.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 150,
+      "name": "direction.left.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 151,
+      "name": "direction.right.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 152,
+      "name": "direction.right.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 153,
+      "name": "direction.right.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 154,
+      "name": "direction.up_left.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 155,
+      "name": "direction.up_left.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 156,
+      "name": "direction.up_left.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 157,
+      "name": "direction.up_right.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 158,
+      "name": "direction.up_right.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 159,
+      "name": "direction.up_right.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 160,
+      "name": "direction.down_left.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 161,
+      "name": "direction.down_left.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 162,
+      "name": "direction.down_left.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 163,
+      "name": "direction.down_right.free_run",
+      "formula": "ray free cells / max(width,height)"
+    },
+    {
+      "index": 164,
+      "name": "direction.down_right.enemy_distance",
+      "formula": "nearest alive candidate Manhattan / max_path; absent=1"
+    },
+    {
+      "index": 165,
+      "name": "direction.down_right.enemy_present",
+      "formula": "bool(alive candidate in octant)"
+    },
+    {
+      "index": 166,
+      "name": "move_mask.up",
+      "formula": "bool(terrain and dynamic occupancy allow move)"
+    },
+    {
+      "index": 167,
+      "name": "move_mask.down",
+      "formula": "bool(terrain and dynamic occupancy allow move)"
+    },
+    {
+      "index": 168,
+      "name": "move_mask.left",
+      "formula": "bool(terrain and dynamic occupancy allow move)"
+    },
+    {
+      "index": 169,
+      "name": "move_mask.right",
+      "formula": "bool(terrain and dynamic occupancy allow move)"
+    },
+    {
+      "index": 170,
+      "name": "arena.reachable_area_ratio",
+      "formula": "reachable cells / max(1, walkable cells)"
+    },
+    {
+      "index": 171,
+      "name": "arena.walkable_area_ratio",
+      "formula": "walkable cells / max(1, width*height)"
+    },
+    {
+      "index": 172,
+      "name": "arena.dead_end",
+      "formula": "bool(valid move directions <= 1)"
+    },
+    {
+      "index": 173,
+      "name": "delta.hp_ratio",
+      "formula": "(HP - previousHP) / max(1, MaxHP)"
+    },
+    {
+      "index": 174,
+      "name": "delta.score_ratio",
+      "formula": "(Score - previousScore) / 1000"
+    },
+    {
+      "index": 175,
+      "name": "delta.damage_dealt_ratio",
+      "formula": "(DamageDealt - previousDamageDealt) / 1000"
+    },
+    {
+      "index": 176,
+      "name": "delta.damage_taken_ratio",
+      "formula": "(DamageTaken - previousDamageTaken) / 1000"
+    },
+    {
+      "index": 177,
+      "name": "previous_strategy.hold",
+      "formula": "bool(previous executed strategy == hold)"
+    },
+    {
+      "index": 178,
+      "name": "previous_strategy.flee",
+      "formula": "bool(previous executed strategy == flee)"
+    },
+    {
+      "index": 179,
+      "name": "previous_strategy.seek_powerup",
+      "formula": "bool(previous executed strategy == seek_powerup)"
+    },
+    {
+      "index": 180,
+      "name": "previous_strategy.explore",
+      "formula": "bool(previous executed strategy == explore)"
+    },
+    {
+      "index": 181,
+      "name": "previous_strategy.attack_candidate_0",
+      "formula": "bool(previous executed strategy == attack_candidate_0)"
+    },
+    {
+      "index": 182,
+      "name": "previous_strategy.attack_candidate_1",
+      "formula": "bool(previous executed strategy == attack_candidate_1)"
+    },
+    {
+      "index": 183,
+      "name": "previous_strategy.attack_candidate_2",
+      "formula": "bool(previous executed strategy == attack_candidate_2)"
+    },
+    {
+      "index": 184,
+      "name": "previous_strategy.attack_candidate_3",
+      "formula": "bool(previous executed strategy == attack_candidate_3)"
+    },
+    {
+      "index": 185,
+      "name": "previous_strategy.attack_candidate_4",
+      "formula": "bool(previous executed strategy == attack_candidate_4)"
+    },
+    {
+      "index": 186,
+      "name": "previous_strategy.attack_candidate_5",
+      "formula": "bool(previous executed strategy == attack_candidate_5)"
+    },
+    {
+      "index": 187,
+      "name": "previous_strategy.attack_candidate_6",
+      "formula": "bool(previous executed strategy == attack_candidate_6)"
+    },
+    {
+      "index": 188,
+      "name": "history.same_position_streak_ratio",
+      "formula": "SamePositionStreak / 8"
+    },
+    {
+      "index": 189,
+      "name": "history.no_progress_ratio",
+      "formula": "NoProgressActions / 16"
+    },
+    {
+      "index": 190,
+      "name": "history.current_cell_visits_ratio",
+      "formula": "Visits[self position] / 8"
+    },
+    {
+      "index": 191,
+      "name": "history.two_cycle_ratio",
+      "formula": "TwoCycleCount / 4"
+    },
+    {
+      "index": 192,
+      "name": "history.three_cycle_ratio",
+      "formula": "ThreeCycleCount / 4"
+    },
+    {
+      "index": 193,
+      "name": "history.target_persistence_ratio",
+      "formula": "SelectedTargetStreak / 8"
+    },
+    {
+      "index": 194,
+      "name": "strategy_mask.hold",
+      "formula": "strategy feasibility mask[0]"
+    },
+    {
+      "index": 195,
+      "name": "strategy_mask.flee",
+      "formula": "strategy feasibility mask[1]"
+    },
+    {
+      "index": 196,
+      "name": "strategy_mask.seek_powerup",
+      "formula": "strategy feasibility mask[2]"
+    },
+    {
+      "index": 197,
+      "name": "strategy_mask.explore",
+      "formula": "strategy feasibility mask[3]"
+    },
+    {
+      "index": 198,
+      "name": "strategy_mask.attack_candidate_0",
+      "formula": "strategy feasibility mask[4]"
+    },
+    {
+      "index": 199,
+      "name": "strategy_mask.attack_candidate_1",
+      "formula": "strategy feasibility mask[5]"
+    },
+    {
+      "index": 200,
+      "name": "strategy_mask.attack_candidate_2",
+      "formula": "strategy feasibility mask[6]"
+    },
+    {
+      "index": 201,
+      "name": "strategy_mask.attack_candidate_3",
+      "formula": "strategy feasibility mask[7]"
+    },
+    {
+      "index": 202,
+      "name": "strategy_mask.attack_candidate_4",
+      "formula": "strategy feasibility mask[8]"
+    },
+    {
+      "index": 203,
+      "name": "strategy_mask.attack_candidate_5",
+      "formula": "strategy feasibility mask[9]"
+    },
+    {
+      "index": 204,
+      "name": "strategy_mask.attack_candidate_6",
+      "formula": "strategy feasibility mask[10]"
+    },
+    {
+      "index": 205,
+      "name": "aggregate.alive_candidate_ratio",
+      "formula": "alive assigned candidates / 7"
+    },
+    {
+      "index": 206,
+      "name": "aggregate.reachable_candidate_ratio",
+      "formula": "reachable attack candidates / 7"
+    },
+    {
+      "index": 207,
+      "name": "aggregate.attackable_now_ratio",
+      "formula": "self primary-hittable candidates / 7"
+    },
+    {
+      "index": 208,
+      "name": "aggregate.current_threat_ratio",
+      "formula": "candidates primary-hitting self / 7"
+    },
+    {
+      "index": 209,
+      "name": "aggregate.min_attack_path_ratio",
+      "formula": "minimum reachable attack path / max_path; absent=1"
+    },
+    {
+      "index": 210,
+      "name": "aggregate.best_finish_opportunity",
+      "formula": "max(1 - candidate hp ratio); absent=0"
+    },
+    {
+      "index": 211,
+      "name": "aggregate.max_immediate_threat_damage",
+      "formula": "max threat average damage / max(1, self.MaxHP); absent=0"
+    },
+    {
+      "index": 212,
+      "name": "aggregate.flee_safety_gain",
+      "formula": "(current threat count - minimum reachable-cell threat count) / 7"
+    },
+    {
+      "index": 213,
+      "name": "aggregate.explore_opportunity",
+      "formula": "1 - min(non-current reachable-cell visits,8)/8; absent=0"
+    }
+  ]
+}

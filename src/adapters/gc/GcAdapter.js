@@ -21,7 +21,7 @@ class GcAdapter extends BaseGameAdapter {
   constructor(opts) {
     super(opts)
     this.runtimeContext = opts.runtimeContext || { feature_dim: 153, feature_version: '7.0' }
-    this.collectLegacyTraining = this.runtimeContext.feature_version !== '8.0'
+    this.collectLegacyTraining = !this.runtimeContext.feature_version.startsWith('8.')
     this.clientContract = createClientContract(opts.agentVersion, this.runtimeContext.feature_version)
     this.api = new GcApiClient(this.config, this.clientContract)
     this.ws = new GcSocketClient(this.config)

@@ -3,6 +3,7 @@ const path = require('path')
 const crypto = require('crypto')
 const { createLogger } = require('../../utils/logger')
 const { GcV8Teacher } = require('../../training/GcV8Teacher')
+const { GcStrategyV81Teacher } = require('../../training/GcStrategyV81Teacher')
 const log = createLogger('exporter')
 
 class TrainingExporter {
@@ -17,7 +18,7 @@ class TrainingExporter {
   }
 
   exportForTraining(game, minSessions = 10) {
-    if (this.runtimeContext.feature_version === '8.0') {
+    if (this.runtimeContext.feature_version === '8.0' || this.runtimeContext.feature_version === '8.1') {
       return this.exportV8ForTraining(game, minSessions)
     }
     const sessions = this.store.getCompletedSessions(game)
@@ -112,7 +113,10 @@ class TrainingExporter {
     }
 
     const sessionById = new Map(sessions.map(session => [session.session_id, session]))
-    const teacher = new GcV8Teacher(this.behaviorProfile)
+    const strategyModel = this.runtimeContext.feature_version === '8.1'
+    const teacher = strategyModel
+      ? new GcStrategyV81Teacher(this.behaviorProfile)
+      : new GcV8Teacher(this.behaviorProfile)
     const featureCount = this.runtimeContext.feature_dim
     const samples = []
     for (const frame of feed.frames) {
@@ -138,7 +142,7 @@ class TrainingExporter {
       samples: samples.map(sample => ({
         frame_id: sample.frame.frame_id,
         feature_vector: sample.frame.input.feature_vector,
-        teacher_action: sample.label.teacher_action,
+        teacher_label: strategyModel ? sample.label.teacher_strategy : sample.label.teacher_action,
         sample_weight: sample.label.sample_weight,
       })),
     }
@@ -152,7 +156,7 @@ class TrainingExporter {
       dataset_session_from: sessions[0].session_id,
       dataset_session_to: sessions[sessions.length - 1].session_id,
       sample_count: samples.length,
-      label_source: 'bfs_teacher',
+      label_source: strategyModel ? 'strategy_teacher_v8_1' : 'bfs_teacher',
       observation_policy: datasetDescriptor.observation_policy,
       source_behavior_profile_hashes: datasetDescriptor.source_behavior_profile_hashes,
       generated_at: new Date().toISOString(),
@@ -169,16 +173,22 @@ class TrainingExporter {
     const ticksPath = path.join(this.exportDir, `${game}_ticks.csv`)
     const header = ['session_id', 'frame_id', 'tick']
     for (let i = 0; i < featureCount; i++) header.push(`f${i}`)
-    header.push('action', 'sample_weight', 'observed_action', 'executed_action', 'teacher_reason', 'rank', 'score')
+    header.push(
+      strategyModel ? 'strategy' : 'action',
+      'sample_weight',
+      strategyModel ? 'observed_strategy' : 'observed_action',
+      strategyModel ? 'executed_strategy' : 'executed_action',
+      'teacher_reason', 'rank', 'score'
+    )
     const lines = [header.join(',')]
     for (const sample of samples) {
       const row = [sample.frame.session_id, sample.frame.frame_id, sample.frame.tick]
       row.push(...sample.frame.input.feature_vector)
       row.push(
-        sample.label.teacher_action,
+        strategyModel ? sample.label.teacher_strategy : sample.label.teacher_action,
         sample.label.sample_weight,
-        sample.label.observed_action,
-        sample.label.executed_action,
+        strategyModel ? sample.label.observed_strategy : sample.label.observed_action,
+        strategyModel ? sample.label.executed_strategy : sample.label.executed_action,
         sample.label.teacher_reason,
         sample.result.rank,
         sample.result.score

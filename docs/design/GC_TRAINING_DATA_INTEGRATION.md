@@ -1,6 +1,6 @@
 # GC v8 학습 데이터 연동 계약
 
-> **재설계 공지:** 기존 `8.0 / 192차원 / 5방향` 계약은 실험 상태로 동결한다. 첫 운영 v8 모델은 `GC_AI_STRATEGY_V8_PLAN.md`의 `8.1 / 214차원 / 11전략` 공동 검토가 끝난 뒤 생성한다. 아래 192/5 내용은 기존 구현 근거와 마이그레이션 경계로 유지한다.
+> **재설계 상태:** 기존 `8.0 / 192차원 / 5방향`은 실험 계약으로 유지하고, 첫 운영 후보는 `8.1 / 214차원 / 11전략`이다. GC Round 4 canonical 구현과 AI Agent Round 5 parity가 완료됐으며 테스트 서버 E2E 전에는 업로드·canary·운영 전환하지 않는다. 세부 전략 계약은 `GC_AI_STRATEGY_V8_PLAN.md`를 따른다.
 
 GC Go 서버와 AI Agent가 합의한 v8 운영 학습 데이터의 책임, wire contract와 AI Agent 구현 경계를 정의한다.
 
@@ -8,10 +8,10 @@ GC Go 서버와 AI Agent가 합의한 v8 운영 학습 데이터의 책임, wire
 
 운영 학습 데이터는 권장안 C를 사용한다.
 
-- GC는 실제 추론 직전에 사용한 192차원 vector와 5개 action mask를 제공한다.
+- GC는 실제 추론 직전에 사용한 versioned vector와 mask를 제공한다. v8.0은 `192/5 action`, v8.1은 `214/11 strategy`다.
 - GC는 같은 의사결정 시점의 authoritative raw pre-state와 NavigationHistory snapshot을 제공한다.
 - AI Agent는 GC vector를 운영 모델의 입력으로 사용한다.
-- AI Agent는 raw state와 관리자 behavior profile로 `teacher_action`과 `sample_weight`를 계산한다.
+- AI Agent는 raw state와 관리자 behavior profile로 v8.0의 `teacher_action` 또는 v8.1의 `teacher_strategy`, 그리고 `sample_weight`를 계산한다.
 - AI Agent의 FeatureBuilder는 canonical parity와 synthetic maze 생성에만 사용한다.
 - shared viewer WebSocket/Socket.IO는 신뢰 가능한 학습 데이터 transport로 사용하지 않는다.
 
@@ -30,6 +30,8 @@ AI Agent는 직접 이동을 제출하지 않는다. GC가 업로드된 ONNX를 
 | `sample_weight` | AI Agent | profile과 결과 기반 loss 가중치 |
 
 `executed_action`을 자동으로 teacher label로 사용하지 않는다.
+
+v8.1은 `raw_argmax_strategy`, `model_strategy`, `executed_strategy`, `selected_target_slot`, `executed_target_slot`, `path_action`, `executed_action`을 분리한다. 전략 label과 한 칸 이동 action을 같은 필드에 저장하지 않는다.
 
 ## API 계약
 
@@ -52,14 +54,15 @@ GET /api/v1/agents/me/training-sessions/{session_id}
 
 ## Frame 검증
 
-AI Agent는 cursor를 갱신하기 전에 다음을 검사한다.
+AI Agent는 cursor를 갱신하기 전에 feature contract별로 다음을 검사한다.
 
-- `record_version=1`
+- v8.0은 `record_version=1`, v8.1은 `record_version=2`
 - operation version 일치
-- feature version, 192차원, schema hash 일치
-- feature vector가 정확히 192개의 유한한 숫자
-- action mask가 정확히 5개의 boolean/0/1
-- action enum과 execution status enum 유효성
+- feature version, dimension, raw-byte schema hash 일치
+- v8.0 vector는 192개, v8.1 vector는 214개의 유한한 숫자
+- v8.0 action mask는 5개, v8.1 strategy mask는 11개의 boolean/0/1
+- v8.1 strategy mask와 vector index `194..204` 완전 일치
+- action·strategy·target·override enum 유효성
 - behavior profile hash 형식
 - session manifest의 session ID 일치
 
@@ -167,6 +170,11 @@ AI Agent 준비 완료:
 - GC capability 정규화와 `loadout_profile_id/hash/revision` 로컬 검증
 - capability 지원 서버에만 complete loadout profile tuple 전송
 - 미지원·preflight 실패 서버에는 legacy challenge payload 유지
+- GC canonical v8.1 schema raw-byte hash `sha256:330be3849f095e9ffca2c46bb4a13b2c9cbbc0c55aade67aa163e0307a1e1a82` 동기화
+- 독립 JS builder와 GC fixture의 214 vector 전체, 11 mask, candidate map parity 통과
+- v8.1 `record_version=2` parser와 mask/vector 중복 계약 검증
+- 성격별 11-class strategy teacher와 primary target label 생성
+- 214차원 exporter와 `gc_strategy_net` 214→11 trainer·metadata 구현
 
 GC 서버 코드 및 격리 테스트 서버 완료, 운영 배포 필요:
 

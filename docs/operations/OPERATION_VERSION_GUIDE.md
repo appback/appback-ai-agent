@@ -33,9 +33,10 @@ npx appback-ai-agent operation verify
 npx appback-ai-agent operation history
 npx appback-ai-agent operation activate v7 --yes
 npx appback-ai-agent operation activate v8 --yes
+npx appback-ai-agent operation activate v81 --yes
 ```
 
-`init` 또는 최초 실행은 v7 계약을 기본 초기화한다. v8은 대상 agent에서만 명시적으로 활성화한다. 저장된 v7/v8 계약은 재시작 시 자동 감지되며 계약과 다른 데이터, export, model은 사용할 수 없다.
+`v8`은 실험 이동 계약 `8.0/192/5`, `v81`은 전략 계약 `8.1/214/11`이다. `init` 또는 최초 실행은 v7 계약을 기본 초기화한다. v8 계열은 대상 agent에서만 명시적으로 활성화한다. 저장된 계약은 재시작 시 자동 감지되며 계약과 다른 데이터, export, model은 사용할 수 없다.
 
 ## GC 서버 전환 연동
 
@@ -63,9 +64,17 @@ npx appback-ai-agent start
 
 `activate v8 --yes`는 이전 계약을 `config/operation.history/`에 보관하고 v8 계약을 활성화한다. 기존 데이터나 모델을 삭제하지 않지만 새 운영 세대에서는 조회하거나 로드하지 않는다.
 
+v8.1 Round 6 격리 테스트에서는 테스트 agent에서만 다음을 사용한다. GC `/agent-contract`가 `8.1`을 광고하고 canonical schema hash가 일치하기 전에는 실행하지 않는다.
+
+```bash
+npx appback-ai-agent operation activate v81 --yes
+npx appback-ai-agent operation verify
+npx appback-ai-agent doctor
+```
+
 v8에서는 기존 viewer snapshot과 로컬 153차원 FeatureBuilder 결과를 저장하거나 자동학습에 사용하지 않는다. GC가 제공하는 authoritative frame/result/session feed만 30초 간격으로 수집한다. 필요하면 `.env`에서 `GC_TRAINING_SYNC_ENABLED=false`로 중지하거나 `GC_TRAINING_SYNC_INTERVAL_SEC`로 주기를 조정한다.
 
-수집된 v8 frame은 다음 명령으로 현재 성격의 BFS teacher label과 sample weight를 적용해 192차원 학습셋으로 내보낼 수 있다.
+수집된 v8 frame은 다음 명령으로 현재 성격의 teacher label과 sample weight를 적용해 내보낸다. v8.0은 192차원 이동 label, v8.1은 214차원 전략 label을 생성한다.
 
 ```bash
 npx appback-ai-agent export

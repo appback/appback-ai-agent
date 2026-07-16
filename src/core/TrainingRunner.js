@@ -28,7 +28,10 @@ class TrainingRunner {
     log.info(`Starting training for ${game} (python: ${this.pythonPath})...`)
 
     return new Promise((resolve) => {
-      const scriptPath = path.join(__dirname, '..', '..', 'training', 'train_gc_model.py')
+      const scriptName = this.runtimeContext?.feature_version === '8.1'
+        ? 'train_gc_strategy_model.py'
+        : 'train_gc_model.py'
+      const scriptPath = path.join(__dirname, '..', '..', 'training', scriptName)
       const proc = spawn(this.pythonPath, [
         scriptPath,
         '--data-dir', this.dataDir,
