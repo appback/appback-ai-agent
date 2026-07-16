@@ -51,7 +51,6 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 
 ### Requests (외부 협업 요청)
 - [REQUEST_GC_LOADOUT_PROFILE_CONTRACT.md](requests/REQUEST_GC_LOADOUT_PROFILE_CONTRACT.md) — 장비 선택 성격 식별자의 challenge/session 계약 보강 요청
-- [REQUEST_GC_STRATEGY_V8_REVIEW.md](requests/REQUEST_GC_STRATEGY_V8_REVIEW.md) — 계층형 전략 v8.1 계약의 GC 코드 대조 검토 요청
 - [REQUEST_SAME_IP_MATCHING_BLOCK.md](requests/REQUEST_SAME_IP_MATCHING_BLOCK.md) — 매칭 정책 요청
 - [REQUEST_TICK_WEAPON.md](requests/REQUEST_TICK_WEAPON.md) — Tick state weapon 필드 추가 (완료)
 

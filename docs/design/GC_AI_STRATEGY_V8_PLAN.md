@@ -4,6 +4,24 @@
 작성 기준: AI Agent `6270f6b`, GC `6cdc6c4`
 상위 계약: `GC_TRAINING_DATA_INTEGRATION.md`
 
+## GC 담당자 전달 지시
+
+**GC 담당자에게는 이 파일 하나만 전달한다.** 별도 요청서나 설명문은 필요하지 않다.
+
+GC 담당자는 현재 GC 코드와 이 계획을 대조하되 아직 구현·배포하지 않는다. 먼저 `10. AI Agent와 GC 교차 검증 절차`의 Round 2 항목을 검토하고 각 항목을 다음 형식으로 회신한다.
+
+```text
+[항목]
+판정: ACCEPT | CHANGE | REJECT
+코드 근거: 파일:라인
+이유:
+수정 제안:
+AI Agent 영향:
+GC 영향:
+```
+
+회신 마지막에는 feature version, input/output dimension, strategy label 순서, candidate ordering, path executor, attack target, training frame 계약의 GC 최종 제안표를 포함한다. AI Agent는 그 회신을 받아 이 문서를 revision 2로 수정한다.
+
 ## 1. 재설계 결론
 
 기존 v8.0은 192차원 입력으로 다음 한 칸의 방향 5개를 선택한다. GC의 BFS는 feature 생성과 안전 fallback에 사용되지만 모델이 선택한 고수준 목표를 끝까지 실행하지 않는다. 공격 대상도 모델이 아니라 GC의 거리·slot 고정 규칙이 선택한다.
@@ -298,6 +316,19 @@ GC는 코드 기준으로 다음을 답한다.
 7. 기존 v7 운영을 유지하며 8.1 canary를 격리할 수 있는가?
 
 GC는 각 항목을 `accept/change/reject`로 답하고 변경안을 제시한다.
+
+회신 마지막 표:
+
+| 계약 | AI 초안 | GC 제안 | 합의 가능 여부 |
+|---|---|---|---|
+| feature version | 8.1 | | |
+| input dimension | 214 | | |
+| output dimension | 11 | | |
+| strategy labels | hold/flee/seek_powerup/explore/attack_candidate_0..6 | | |
+| candidate ordering | session 고정 slot 오름차순 | | |
+| path executor | GC 소유 | | |
+| attack target | model 선택 우선 | | |
+| training frame | strategy/path/action/target 분리 | | |
 
 ### Round 3: AI Agent 계약 수정
 
