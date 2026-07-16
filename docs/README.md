@@ -13,6 +13,7 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 |---|---|
 | 전체 구조와 장기 방향 | `overview/ARCHITECTURE.md`, `design/AI_AGENT_ADVANCEMENT_PLAN.md` |
 | AI Agent 실행 계획과 구현 상태 | `design/AI_AGENT_DEVELOPMENT_PLAN.md` |
+| GC/AI 계층형 전략 v8.1 공동 계약 | `design/GC_AI_STRATEGY_V8_PLAN.md` |
 | GC 서버 학습 데이터 계약 | `design/GC_TRAINING_DATA_INTEGRATION.md` |
 | 성격 관리자 CLI | `operations/PERSONALITY_CLI_GUIDE.md` |
 | operation·데이터·모델 격리 | `operations/OPERATION_VERSION_GUIDE.md` |
@@ -45,10 +46,12 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 - [TRAINING_PIPELINE.md](design/TRAINING_PIPELINE.md) — 자동 학습 파이프라인
 - [AI_AGENT_ADVANCEMENT_PLAN.md](design/AI_AGENT_ADVANCEMENT_PLAN.md) — 미로 대응, 학습 프로필, v8 데이터 계약 고도화 계획
 - [AI_AGENT_DEVELOPMENT_PLAN.md](design/AI_AGENT_DEVELOPMENT_PLAN.md) — 관리자 성격 Easy/Expert 모드, CLI, 학습·평가 실행 계획
+- [GC_AI_STRATEGY_V8_PLAN.md](design/GC_AI_STRATEGY_V8_PLAN.md) — 214차원/11전략, 공격 대상 선택과 GC 경로 실행 공동 계획
 - [GC_TRAINING_DATA_INTEGRATION.md](design/GC_TRAINING_DATA_INTEGRATION.md) — GC v8 training frame·cursor·모델 revision 연동 계약
 
 ### Requests (외부 협업 요청)
 - [REQUEST_GC_LOADOUT_PROFILE_CONTRACT.md](requests/REQUEST_GC_LOADOUT_PROFILE_CONTRACT.md) — 장비 선택 성격 식별자의 challenge/session 계약 보강 요청
+- [REQUEST_GC_STRATEGY_V8_REVIEW.md](requests/REQUEST_GC_STRATEGY_V8_REVIEW.md) — 계층형 전략 v8.1 계약의 GC 코드 대조 검토 요청
 - [REQUEST_SAME_IP_MATCHING_BLOCK.md](requests/REQUEST_SAME_IP_MATCHING_BLOCK.md) — 매칭 정책 요청
 - [REQUEST_TICK_WEAPON.md](requests/REQUEST_TICK_WEAPON.md) — Tick state weapon 필드 추가 (완료)
 
