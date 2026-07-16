@@ -2,7 +2,7 @@
 
 AI Agent의 행동 성격을 Easy 또는 Expert 모드로 설정하는 관리자 가이드다.
 
-현재 구현 범위는 성격 설정, 검증, revision, backup, 런타임 식별과 성격 기반 장비 선택까지다. 장비 선호는 agent 재시작 후 다음 challenge부터 적용된다. 이동 모델은 즉시 변경하지 않으며 v8 학습에서 profile hash가 같은 새 모델을 생성해야 반영된다.
+현재 구현 범위는 성격 설정, 검증, revision, backup, 런타임 식별과 성격 기반 장비 선택까지다. 장비 선호는 agent 재시작 후 다음 challenge부터 적용된다. 이동 모델은 즉시 변경하지 않으며 v8 학습에서 profile hash가 같은 새 모델을 생성해야 반영된다. GC가 `loadout_profile_context` capability를 제공하면 challenge에 성격 ID/hash/revision도 함께 기록되고, 미지원 서버에는 기존 장비 payload만 전송한다.
 
 ---
 

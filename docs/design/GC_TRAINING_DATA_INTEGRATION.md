@@ -67,7 +67,7 @@ frame의 `behavior_profile`은 당시 서버에 배포된 모델 profile이다. 
 
 ## 장비 성격과 서버 계약
 
-상태: **양측 계약 합의 완료, GC 구현·배포 pending, AI Agent 전송 비활성**
+상태: **GC 구현·격리 테스트 서버 선배포 완료, AI Agent capability 기반 전송 활성**
 
 AI Agent의 effective `behavior_profile_hash`에는 이동 목표·정책뿐 아니라 장비 선호 가중치도 포함한다. GC 서버는 이 가중치를 해석하거나 장비를 선택하지 않는다.
 
@@ -104,6 +104,8 @@ AI Agent의 effective `behavior_profile_hash`에는 이동 목표·정책뿐 아
 - 서버가 필드를 지원하기 전 AI Agent가 임의로 전송하지 않는다. GC 배포 후 agent-contract capability를 확인하고 활성화한다.
 - `capabilities.loadout_profile_context=true`는 서버의 수신·저장 지원만 뜻하며 현재 요청에서 필수라는 의미가 아니다.
 - v7 호환 기간에는 세 필드를 선택사항으로 허용한다. 향후 v8 필수화는 별도 enforcement 계약과 최소 AI Agent 버전을 확정한 뒤 진행한다.
+- contract preflight 실패, capability 누락 또는 `false`이면 기존 weapon/armor/tier만 전송한다.
+- capability가 `true`이면 AI Agent는 effective profile에서 완전한 세 필드를 생성하고 로컬 형식 검증 후 전송한다. 부분 tuple은 client 경계에서 차단한다.
 
 이 계약은 v8 canary의 장비 성격별 데이터 감사를 위한 필수 보강이다. 구현 순서는 GC migration/API/queue 전달/training manifest·result/capability 선배포, AI Agent 전송 활성화, 통합 테스트 순으로 한다.
 
@@ -160,14 +162,19 @@ AI Agent 준비 완료:
 - v8에서는 legacy viewer snapshot 수집과 v7 자동학습 차단
 - 관리자 profile 기반 BFS teacher, sample weight와 192차원 CSV/manifest export
 - Python trainer의 v7 보정 경로와 v8 teacher-label 경로 분리
+- GC capability 정규화와 `loadout_profile_id/hash/revision` 로컬 검증
+- capability 지원 서버에만 complete loadout profile tuple 전송
+- 미지원·preflight 실패 서버에는 legacy challenge payload 유지
 
-GC 서버 코드 완료, 운영 배포 필요:
+GC 서버 코드 및 격리 테스트 서버 완료, 운영 배포 필요:
 
 - training session/frame/result 저장소와 cursor API 구현
 - v8 canary/active Engine.Run, NavigationHistory, NavigationSafety 연결
 - model canary/activate/rollback과 canonical fixture 구현
-- 기준 commit: `0f2c33b4ecdc020b582a5f22e46f35d5ff47e951`
+- v8 engine/training 기준 commit: `0f2c33b4ecdc020b582a5f22e46f35d5ff47e951`
+- loadout profile 계약 기준 commit: `6cdc6c403e794d53e7bdade2862d616cf189532e`
+- 격리 테스트 서버는 `loadout_profile_context=true`, observe 모드로 검증
 
-저장된 raw state와 관리자 profile을 결합하는 BFS `teacher_action`/`sample_weight`와 v8 export·학습 입력 분리는 구현됐다. GC 운영 배포 후 실제 agent token으로 cursor E2E를 검증하고, 오프라인 평가 보고서와 v8 model upload를 연결한다.
+저장된 raw state와 관리자 profile을 결합하는 BFS `teacher_action`/`sample_weight`와 v8 export·학습 입력 분리는 구현됐다. 격리 테스트 서버에서 loadout profile challenge HTTP 201/queued와 queue cleanup까지 확인했다. 남은 E2E는 v8 canary 지정, 실제 게임 생성, session/result의 loadout profile snapshot 확인, cursor 수집과 모델 upload다.
 
 GC 후속 수정 필요: 합의된 frame wire contract대로 `agent: {"slot": n}`을 frame payload에 직접 포함해야 한다. 현재 AI Agent의 session 기반 보강은 `0f2c33b4` 호환을 위한 임시 방어다.

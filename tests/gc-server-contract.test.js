@@ -6,10 +6,13 @@ const test = require('node:test')
 const GcApiClient = require('../src/adapters/gc/GcApiClient')
 const packageVersion = require('../package.json').version
 const {
+  LOADOUT_PROFILE_CAPABILITY,
   buildAgentHeaders,
   createClientContract,
+  createLoadoutProfileContext,
   evaluateServerContract,
   isVersionAtLeast,
+  validateLoadoutProfileContext,
 } = require('../src/config/GcServerContract')
 
 test('v7 bridge sends the deployed protocol and agent version headers', () => {
@@ -31,10 +34,86 @@ test('observe reports incompatibility without blocking the running v7 agent', ()
     accepted_feature_versions: ['8.0'],
     required_feature_version: null,
     minimum_agent_version: null,
+    capabilities: { loadout_profile_context: true, future_flag: 'true' },
   }, createClientContract('2.2.1', '7.0'))
 
   assert.equal(status.compatible, false)
   assert.match(status.warnings[0], /feature=7.0/)
+  assert.deepEqual(status.capabilities, {
+    loadout_profile_context: true,
+    future_flag: false,
+  })
+})
+
+test('loadout profile context follows the GC all-or-none contract', () => {
+  const context = createLoadoutProfileContext({
+    profile_id: 'aggressive-v1',
+    profile_hash: `sha256:${'a'.repeat(64)}`,
+    source_revision: 0,
+  })
+  assert.deepEqual(context, {
+    loadout_profile_id: 'aggressive-v1',
+    loadout_profile_hash: `sha256:${'a'.repeat(64)}`,
+    loadout_profile_revision: 0,
+  })
+  assert.equal(LOADOUT_PROFILE_CAPABILITY, 'loadout_profile_context')
+
+  assert.throws(() => createLoadoutProfileContext({
+    profile_id: 'invalid profile',
+    profile_hash: `sha256:${'a'.repeat(64)}`,
+    source_revision: 0,
+  }), /profile ID/)
+  assert.throws(() => createLoadoutProfileContext({
+    profile_id: 'balanced',
+    profile_hash: 'sha256:ABC',
+    source_revision: 0,
+  }), /profile hash/)
+  assert.throws(() => createLoadoutProfileContext({
+    profile_id: 'balanced',
+    profile_hash: `sha256:${'a'.repeat(64)}`,
+    source_revision: -1,
+  }), /profile revision/)
+  assert.throws(() => validateLoadoutProfileContext({
+    loadout_profile_id: 'balanced',
+    loadout_profile_hash: `sha256:${'a'.repeat(64)}`,
+  }), /profile revision/)
+})
+
+test('challenge sends loadout profile context only when supplied', async () => {
+  const api = new GcApiClient({ apiUrl: 'https://example.invalid/api/v1' })
+  const requests = []
+  api.client.post = async (url, payload) => {
+    requests.push({ url, payload })
+    return { data: { status: 'queued' } }
+  }
+
+  const loadout = { weapon: 'hammer', armor: 'cloth_cape', tier: 'basic' }
+  await api.submitChallenge(loadout)
+  await api.submitChallenge(loadout, {
+    loadout_profile_id: 'hunter',
+    loadout_profile_hash: `sha256:${'b'.repeat(64)}`,
+    loadout_profile_revision: 3,
+  })
+
+  assert.deepEqual(requests[0], { url: '/challenge', payload: loadout })
+  assert.deepEqual(requests[1].payload, {
+    ...loadout,
+    loadout_profile_id: 'hunter',
+    loadout_profile_hash: `sha256:${'b'.repeat(64)}`,
+    loadout_profile_revision: 3,
+  })
+  await assert.rejects(api.submitChallenge(loadout, {
+    loadout_profile_id: 'hunter',
+  }), /profile hash/)
+})
+
+test('queue leave uses the authenticated queue cleanup endpoint', async () => {
+  const api = new GcApiClient({ apiUrl: 'https://example.invalid/api/v1' })
+  api.client.delete = async url => {
+    assert.equal(url, '/queue/leave')
+    return { data: { status: 'left' } }
+  }
+  assert.deepEqual(await api.leaveQueue(), { status: 'left' })
 })
 
 test('strict rejects a v7 feature contract and an outdated agent version', () => {

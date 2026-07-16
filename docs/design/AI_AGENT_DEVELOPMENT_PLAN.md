@@ -9,13 +9,13 @@
 - AA-1 완료: Easy/Expert 설정, variation/seed, 장비 선호, 검증, revision/history/rollback, CLI, doctor 확인, 운영 가이드
 - AA-2 완료: GC authoritative frame consumer, BFS 교사 라벨, 성격별 sample weight, 192차원 export와 Python 학습 입력 분리
 - AA-3 부분 완료: 200개 deterministic maze, BFS teacher 평가, canonical 전투 fixture 성격 차별성 평가, JSON report와 CLI 품질 게이트
-- 미연결: ONNX maze 평가, 운영 전투 replay 평가, v8 model upload, GC deployed 상태
+- 미연결: ONNX maze 평가, 운영 전투 replay 평가, v8 model upload, v8 canary 실게임
 - 현재 성격 변경은 기존 운영 모델을 즉시 변경하지 않는다.
 - 운영 버전 관리 완료: operation/feature/training/profile 계약별 DB·export·모델 경로 격리, CLI 전환 차단
 - GC-1 연동 완료: v7 동작을 유지한 protocol/agent-version bridge header, agent-contract preflight, strict 조기 차단
 - GC training data 계약 확정: authoritative vector + raw pre-state, cursor API, teacher/model/executed action 분리
 - consumer runtime 구현 완료: v8 operation 전용 scheduler, frame/result/session validator, SQLite 멱등 저장, operation별 cursor checkpoint
-- GC 계약 합의 완료·구현 pending: challenge의 `loadout_profile_id/hash/revision`, queue·game entry 전달, training session/result 기록. capability는 지원 여부만 나타내며 필수화는 별도 전환
+- GC loadout profile 계약 완료: 서버 migration/API/queue/session/result/capability와 AI Agent capability 기반 challenge 전송 구현. capability는 지원 여부만 나타내며 필수화는 별도 전환
 
 ---
 
@@ -444,7 +444,7 @@ final_score
 - Easy variation은 장비 가중치에도 한 번 적용되며 profile hash에 포함된다.
 - 성격 변경 후 재시작하면 새 profile hash의 장비 성과를 처음부터 축적한다.
 
-GC 서버는 추가 성격 로직을 실행하지 않는다. AI Agent가 계산한 무기·방어구 조합을 적용하되, 데이터 정합성을 위해 challenge에서 `loadout_profile_id/hash/revision`을 all-or-none으로 받아 queue와 game entry를 거쳐 session manifest/result에 기록해야 한다. 이 계약이 배포되기 전에는 장비 선택은 동작하지만 서버 training feed만으로 장비를 선택한 성격을 감사할 수 없다.
+GC 서버는 추가 성격 로직을 실행하지 않는다. AI Agent가 계산한 무기·방어구 조합을 적용하고 `loadout_profile_id/hash/revision`을 all-or-none으로 전송한다. GC는 이를 queue와 game entry를 거쳐 session manifest/result에 기록한다. AI Agent는 `/agent-contract`의 `loadout_profile_context=true`를 확인한 서버에만 세 필드를 보내며, 미지원 서버에는 기존 payload를 유지한다.
 
 ### 데이터 수집
 

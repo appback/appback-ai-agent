@@ -6,7 +6,12 @@ const GcFeatureBuilder = require('./GcFeatureBuilder')
 const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
 const { INACTIVE_STATES } = require('./constants')
-const { createClientContract, evaluateServerContract } = require('../../config/GcServerContract')
+const {
+  LOADOUT_PROFILE_CAPABILITY,
+  createClientContract,
+  createLoadoutProfileContext,
+  evaluateServerContract,
+} = require('../../config/GcServerContract')
 const log = createLogger('gc-adapter')
 
 // v6.0 action labels: model output index → direction
@@ -22,7 +27,9 @@ class GcAdapter extends BaseGameAdapter {
     this.ws = new GcSocketClient(this.config)
     this.strategyEngine = new GcStrategyEngine()
     this.featureBuilder = new GcFeatureBuilder()
+    this.behaviorProfile = opts.behaviorProfile || null
     this.equipmentManager = new GcEquipmentManager(this.dataCollector?.store, opts.behaviorProfile)
+    this.serverCapabilities = Object.freeze({})
     this.metrics = opts.metrics || null
     this.modelRelativePath = opts.modelRelativePath || null
     this.activeGameId = null
@@ -129,15 +136,22 @@ class GcAdapter extends BaseGameAdapter {
     try {
       const serverContract = await this.api.getAgentContract()
       const status = evaluateServerContract(serverContract, this.clientContract)
+      this.serverCapabilities = status.capabilities
       log.info(
         `GC contract: protocol=${serverContract.protocol_version}, ` +
-        `enforcement=${status.enforcement}, feature=${this.clientContract.feature_version}`
+        `enforcement=${status.enforcement}, feature=${this.clientContract.feature_version}, ` +
+        `loadoutProfile=${this.serverCapabilities[LOADOUT_PROFILE_CAPABILITY] === true}`
       )
       for (const warning of status.warnings) log.warn(`GC observe contract warning: ${warning}`)
     } catch (err) {
       if (String(err.message).includes('GC strict contract rejected')) throw err
       log.warn(`GC contract preflight unavailable, continuing for compatibility: ${err.message}`)
     }
+  }
+
+  _getLoadoutProfileContext() {
+    if (this.serverCapabilities[LOADOUT_PROFILE_CAPABILITY] !== true) return null
+    return createLoadoutProfileContext(this.behaviorProfile)
   }
 
   async _onReconnect() {
@@ -271,7 +285,10 @@ class GcAdapter extends BaseGameAdapter {
     try {
       // Select optimal loadout based on historical performance
       this.currentLoadout = this.equipmentManager.selectLoadout()
-      const result = await this.api.submitChallenge(this.currentLoadout)
+      const result = await this.api.submitChallenge(
+        this.currentLoadout,
+        this._getLoadoutProfileContext()
+      )
 
       log.info(`Challenge result: ${result.status}`, result)
 

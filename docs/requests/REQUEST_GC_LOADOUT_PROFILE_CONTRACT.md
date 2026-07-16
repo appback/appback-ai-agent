@@ -4,7 +4,14 @@
 
 AI Agent는 behavior profile에 따라 무기·방어구를 선택한다. 서버 ONNX 모델 성격과 challenge 시점의 장비 선택 성격이 다를 수 있으므로 두 식별자를 분리 기록해야 한다.
 
-상태: **AI Agent·GC 계약 검토 완료, GC 구현·배포 pending**
+상태: **GC 구현 및 격리 테스트 서버 선배포 완료, AI Agent capability 기반 전송 구현 완료**
+
+구현 기준:
+
+- GC 구현: `6cdc6c403e794d53e7bdade2862d616cf189532e`
+- GC 배포 기록: `b7aa0bf9566be301a00dafc8e166f03bd66cf904`
+- GC migration: `070_loadout_profile_context.sql`
+- AI Agent: `/agent-contract` capability가 정확히 `true`일 때만 세 필드를 전송
 
 ## 요청 범위
 
@@ -75,5 +82,7 @@ AI Agent는 capability가 확인된 서버에만 신규 필드를 전송한다.
 3. AI Agent capability 기반 전송 활성화
 4. 격리 테스트 서버 실게임 검증
 5. v8 canary 반영
+
+현재 1~3단계와 4단계의 challenge/queue smoke는 완료했다. 격리 테스트 서버에서 capability 확인, 완전한 tuple challenge HTTP 201/queued, queue DB snapshot, 임시 agent 정리를 검증했다. 4단계의 실제 게임 session/result 전달 검증과 5단계 v8 canary 반영은 남아 있다.
 
 관련 기준 문서: `docs/design/GC_TRAINING_DATA_INTEGRATION.md`

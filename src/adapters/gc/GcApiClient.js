@@ -3,7 +3,7 @@ const fs = require('fs')
 const FormData = require('form-data')
 const { createLogger } = require('../../utils/logger')
 const { retry } = require('../../utils/retry')
-const { buildAgentHeaders } = require('../../config/GcServerContract')
+const { buildAgentHeaders, validateLoadoutProfileContext } = require('../../config/GcServerContract')
 const log = createLogger('gc-api')
 
 class GcApiClient {
@@ -58,12 +58,19 @@ class GcApiClient {
     return data
   }
 
-  async submitChallenge(loadout = {}) {
-    const { data } = await this.client.post('/challenge', {
+  async submitChallenge(loadout = {}, loadoutProfileContext = null) {
+    const payload = {
       weapon: loadout.weapon || 'sword',
       armor: loadout.armor || 'leather',
       tier: loadout.tier || 'basic',
-    })
+    }
+    if (loadoutProfileContext) Object.assign(payload, validateLoadoutProfileContext(loadoutProfileContext))
+    const { data } = await this.client.post('/challenge', payload)
+    return data
+  }
+
+  async leaveQueue() {
+    const { data } = await this.client.delete('/queue/leave')
     return data
   }
 
