@@ -149,4 +149,3 @@ GC 영향:
 - 수정 제안에 exact dimension/label/field 의미 포함
 - AI Agent가 계획서 revision 2를 작성할 수 있을 정도의 구체성
 - 구현·배포는 아직 수행하지 않음
-

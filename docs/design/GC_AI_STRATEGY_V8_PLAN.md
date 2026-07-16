@@ -1,7 +1,7 @@
 # GC AI 계층형 전략 v8.1 공동 개발계획
 
-상태: **AI Agent 1차 초안, GC 검토 대기**  
-작성 기준: AI Agent `6270f6b`, GC `6cdc6c4`  
+상태: **AI Agent 1차 초안, GC 검토 대기**
+작성 기준: AI Agent `6270f6b`, GC `6cdc6c4`
 상위 계약: `GC_TRAINING_DATA_INTEGRATION.md`
 
 ## 1. 재설계 결론
@@ -391,4 +391,3 @@ GC 검토에서 반드시 확정한다.
 - powerup 기능 비활성 기간의 label/mask 처리
 - protocol version 유지 또는 증가
 - v8.0 test 데이터·revision 폐기 시점
-
