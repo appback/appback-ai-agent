@@ -3,15 +3,41 @@ const fs = require('fs')
 const FormData = require('form-data')
 const { createLogger } = require('../../utils/logger')
 const { retry } = require('../../utils/retry')
+const { buildAgentHeaders } = require('../../config/GcServerContract')
 const log = createLogger('gc-api')
 
 class GcApiClient {
-  constructor(config) {
+  constructor(config, clientContract = null) {
     this.client = axios.create({
       baseURL: config.apiUrl,
       timeout: 10000,
+      headers: clientContract ? buildAgentHeaders(clientContract) : undefined,
     })
     this.token = null
+  }
+
+  async getAgentContract() {
+    const { data } = await this.client.get('/agent-contract')
+    return data
+  }
+
+  async getTrainingFrames(after = null, limit = 200) {
+    const params = { limit }
+    if (after) params.after = after
+    const { data } = await this.client.get('/agents/me/training-frames', { params })
+    return data
+  }
+
+  async getTrainingResults(after = null, limit = 200) {
+    const params = { limit }
+    if (after) params.after = after
+    const { data } = await this.client.get('/agents/me/training-results', { params })
+    return data
+  }
+
+  async getTrainingSession(sessionId) {
+    const { data } = await this.client.get(`/agents/me/training-sessions/${encodeURIComponent(sessionId)}`)
+    return data
   }
 
   setToken(token) {
@@ -61,11 +87,6 @@ class GcApiClient {
     return data
   }
 
-  async submitMove(gameId, direction) {
-    const { data } = await this.client.post(`/games/${gameId}/move`, { direction })
-    return data
-  }
-
   async getQueueStatus() {
     const { data } = await this.client.get('/queue/status')
     return data
@@ -83,6 +104,26 @@ class GcApiClient {
       headers: form.getHeaders(),
       maxBodyLength: 2 * 1024 * 1024,
     })
+    return data
+  }
+
+  async uploadModelV8(onnxPath, metadata) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      throw new TypeError('v8 model metadata must be an object')
+    }
+
+    const form = new FormData()
+    form.append('model', fs.createReadStream(onnxPath))
+    form.append('metadata', JSON.stringify(metadata))
+    const { data } = await this.client.post('/agents/me/models/v8', form, {
+      headers: form.getHeaders(),
+      maxBodyLength: 2 * 1024 * 1024,
+    })
+    return data
+  }
+
+  async listModelsV8() {
+    const { data } = await this.client.get('/agents/me/models/v8')
     return data
   }
 

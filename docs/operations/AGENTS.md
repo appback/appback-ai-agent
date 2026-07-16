@@ -4,7 +4,7 @@
 
 ---
 
-## Active Agents (5개)
+## Active Agents (6개)
 
 | # | Agent Name | Agent ID | 호스트 | IP / Host | 계정 | 설치 방식 | pm2 이름 |
 |---|---|---|---|---|---|---|---|
@@ -13,6 +13,7 @@
 | 3 | `crab-d0cbca48` | b19f74ba-d7af-4824-b69d-dfb0b7468ba4 | 운영 .20 | 192.168.0.20 | au2222 | 글로벌 (`~/`) | `ai-agent` |
 | 4 | `crab-a80f0b1e` | b386357f-8340-4058-b891-d732d0f8c9d9 | 운영 .21 | 192.168.0.21 (DAONE-PC WSL Ubuntu) | au212 | 글로벌 (`~/`) | `ai-agent` |
 | 5 | `crab-95cf1514` | b13d0b0d-83f1-4f33-a52f-d4ed1d4433c6 | 운영 .26 | 192.168.0.26 (SQream 서버) | ospadmin | **로컬 설치** (`~/ai-agent/`) | `ai-agent` |
+| 6 | `crab-5fdf70d6` | 5101bb05-cefb-4659-8f33-7d2e19ee3176 | 운영 EC2 | 43.202.206.43 | ec2-user | 글로벌 (`~/`) | `ai-agent` |
 
 전부 GC(claw-clash) 등록 + AI Rewards 연동 완료.
 
@@ -56,6 +57,15 @@
 - Node: **v20.20.2** (nvm, 22는 빌드 실패)
 - 설치: **로컬 디렉토리 (`~/ai-agent/`)** + `better-sqlite3` 9.6.0 override
 - 이유: glibc 2.28에서 better-sqlite3 11.x prebuilt 호환 안 됨
+
+### EC2 — 운영 호스트 (43.202.206.43)
+- 접속: `ssh ec2-user@43.202.206.43` (dadp-prod.pem)
+- OS: Amazon Linux 2023 (glibc 2.34)
+- Node: v22.22.0 (nvm)
+- 설치: 글로벌 npm (`appback-ai-agent@2.2.1`)
+- PM2: `ai-agent`, systemd `pm2-ec2-user.service` enabled/active
+- 데이터 위치: `~/data/agent.db`, `~/models/gc/`
+- 자동학습 Python: `~/.venv/bin/python3` (`torch 2.8.0+cpu`)
 
 ---
 
@@ -108,6 +118,7 @@ pm2 logs ai-agent --lines 20 --nostream
 
 | 일자 | 결과 | 비고 |
 |---|---|---|
+| 2026-06-09 | EC2 신규 추가, `crab-5fdf70d6` online, doctor 통과 | appback-ai-agent v2.2.1, PyTorch 2.8.0+cpu |
 | 2026-05-11 | 5개 모두 online, GC API 응답 정상 | model_version=0 (weapon 수정 후 재학습 미진행), .21만 v1 |
 
 후임자는 이 표에 검증 일자/결과 추가할 것.

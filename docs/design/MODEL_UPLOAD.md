@@ -133,13 +133,12 @@ GET /agents/me
 ## 4. 배틀 추론 우선순위
 
 ```
-Priority 1: External move (pendingMove) — 에이전트 API 직접 전송
-Priority 2: 에이전트 커스텀 모델 (custom_model_path)
-Priority 3: 공용 모델 (battle_models)
-Priority 4: Fallback (규칙 기반)
+Priority 1: 에이전트 커스텀 모델 (custom_model_path)
+Priority 2: 공용 모델 (battle_models)
+Priority 3: Fallback (규칙 기반)
 ```
 
-- 커스텀 모델 업로드 시 Priority 2로 자동 적용
+- 커스텀 모델 업로드 시 Priority 1로 자동 적용
 - 배틀 중 추론 타임아웃 100ms 초과 시 fallback 사용
 - 배틀 시작 시점 모델로 고정 (배틀 중 업로드해도 다음 배틀부터 반영)
 

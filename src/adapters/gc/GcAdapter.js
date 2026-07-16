@@ -6,6 +6,7 @@ const GcFeatureBuilder = require('./GcFeatureBuilder')
 const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
 const { INACTIVE_STATES } = require('./constants')
+const { createClientContract, evaluateServerContract } = require('../../config/GcServerContract')
 const log = createLogger('gc-adapter')
 
 // v6.0 action labels: model output index → direction
@@ -14,12 +15,16 @@ const ACTION_LABELS = ['stay', 'up', 'down', 'left', 'right']
 class GcAdapter extends BaseGameAdapter {
   constructor(opts) {
     super(opts)
-    this.api = new GcApiClient(this.config)
+    this.runtimeContext = opts.runtimeContext || { feature_dim: 153, feature_version: '7.0' }
+    this.collectLegacyTraining = this.runtimeContext.feature_version !== '8.0'
+    this.clientContract = createClientContract(opts.agentVersion, this.runtimeContext.feature_version)
+    this.api = new GcApiClient(this.config, this.clientContract)
     this.ws = new GcSocketClient(this.config)
     this.strategyEngine = new GcStrategyEngine()
     this.featureBuilder = new GcFeatureBuilder()
-    this.equipmentManager = new GcEquipmentManager(this.dataCollector?.store)
+    this.equipmentManager = new GcEquipmentManager(this.dataCollector?.store, opts.behaviorProfile)
     this.metrics = opts.metrics || null
+    this.modelRelativePath = opts.modelRelativePath || null
     this.activeGameId = null
     this.mySlot = null
     this.currentLoadout = null
@@ -37,6 +42,8 @@ class GcAdapter extends BaseGameAdapter {
   get supportsRealtime() { return true }
 
   async initialize() {
+    await this._checkServerContract()
+
     // Try loading identity from SQLite
     if (this.dataCollector) {
       const saved = this.dataCollector.store.getIdentity(this.gameName)
@@ -98,10 +105,13 @@ class GcAdapter extends BaseGameAdapter {
       log.warn('Equipment load failed, using defaults', err.message)
     }
 
-    // Try loading ONNX models (v7.0: 153 dims, 5 classes)
-    if (this.modelRegistry) {
-      await this.modelRegistry.loadModel('gc', 'gc_strategy_model', { featureDim: 153 }).catch(() => {})
-      this.modelRegistry.startWatcher()
+    // Only load a model produced for the active operation/profile generation.
+    if (this.modelRegistry && this.modelRelativePath) {
+      await this.modelRegistry.loadModel('gc', 'gc_move_model', {
+        featureDim: this.runtimeContext.feature_dim,
+        path: this.modelRelativePath,
+        runtimeContext: this.runtimeContext,
+      }).catch(err => log.warn(`Active generation model rejected: ${err.message}`))
     }
 
     // Connect WebSocket
@@ -113,6 +123,21 @@ class GcAdapter extends BaseGameAdapter {
 
     // Handle reconnection: re-join room or recover from stale game
     this.ws.onReconnect(() => this._onReconnect())
+  }
+
+  async _checkServerContract() {
+    try {
+      const serverContract = await this.api.getAgentContract()
+      const status = evaluateServerContract(serverContract, this.clientContract)
+      log.info(
+        `GC contract: protocol=${serverContract.protocol_version}, ` +
+        `enforcement=${status.enforcement}, feature=${this.clientContract.feature_version}`
+      )
+      for (const warning of status.warnings) log.warn(`GC observe contract warning: ${warning}`)
+    } catch (err) {
+      if (String(err.message).includes('GC strict contract rejected')) throw err
+      log.warn(`GC contract preflight unavailable, continuing for compatibility: ${err.message}`)
+    }
   }
 
   async _onReconnect() {
@@ -293,7 +318,7 @@ class GcAdapter extends BaseGameAdapter {
     this.ws.joinGame(this.activeGameId)
 
     // Start data collection session
-    if (this.dataCollector) {
+    if (this.dataCollector && this.collectLegacyTraining) {
       this.sessionId = this.dataCollector.startSession(
         this.gameName, this.activeGameId, this.mySlot
       )
@@ -363,7 +388,7 @@ class GcAdapter extends BaseGameAdapter {
       this._terrainCached = false
       this.ws.joinGame(this.activeGameId)
 
-      if (this.dataCollector) {
+      if (this.dataCollector && this.collectLegacyTraining) {
         this.sessionId = this.dataCollector.startSession(
           this.gameName, this.activeGameId, this.mySlot
         )
@@ -411,7 +436,7 @@ class GcAdapter extends BaseGameAdapter {
     // Build features and decide move on phase 0 (passive phase)
     let moveFeatures = null
     let decision = null
-    if (phase === 0 && me.alive) {
+    if (phase === 0 && me.alive && this.collectLegacyTraining) {
       try {
         moveFeatures = this.featureBuilder.buildMoveFeatures(enrichedMe, gameState)
       } catch (err) {
@@ -423,7 +448,7 @@ class GcAdapter extends BaseGameAdapter {
     }
 
     // Record tick data with decision
-    if (this.dataCollector && this.sessionId) {
+    if (this.dataCollector && this.collectLegacyTraining && this.sessionId) {
       const tickState = { agents: agents.map(a => ({
         slot: a.slot, hp: a.hp, maxHp: a.maxHp, x: a.x, y: a.y,
         alive: a.alive, score: a.score,
@@ -448,9 +473,6 @@ class GcAdapter extends BaseGameAdapter {
 
     if (strategy) {
       this._strategyLog.push({ tick, ...strategy })
-      this.api.submitStrategy(this.activeGameId, strategy)
-        .then(res => log.debug(`Strategy submitted at tick ${tick}`, res))
-        .catch(err => log.warn(`Strategy submit failed at tick ${tick}`, err.message))
     }
   }
 
@@ -469,7 +491,7 @@ class GcAdapter extends BaseGameAdapter {
     try {
       // Try ONNX model inference
       if (this.modelRegistry && features) {
-        const model = this.modelRegistry.getProvider('gc', 'gc_move_model') || this.modelRegistry.getProvider('gc', 'gc_strategy_model')
+        const model = this.modelRegistry.getProvider('gc', 'gc_move_model')
         if (model) {
           const result = await model.infer(features)
           logits = result?.logits || null
@@ -480,9 +502,8 @@ class GcAdapter extends BaseGameAdapter {
             const bestIdx = masked.indexOf(Math.max(...masked))
             direction = ACTION_LABELS[bestIdx] || 'stay'
             source = 'model'
+            log.debug(`Model move: ${direction} (logits: [${masked.map(v => v.toFixed(2)).join(',')}])`)
           }
-
-          log.debug(`Model move: ${direction} (logits: [${masked.map(v => v.toFixed(2)).join(',')}])`)
         }
       }
     } catch (err) {
@@ -494,13 +515,6 @@ class GcAdapter extends BaseGameAdapter {
       direction = this._heuristicMove(me, gameState)
     }
 
-    // Submit move to server
-    try {
-      await this.api.submitMove(this.activeGameId, direction)
-    } catch (err) {
-      log.debug(`Move submit failed: ${err.message}`)
-    }
-
     return {
       action: direction,
       source,
@@ -510,7 +524,9 @@ class GcAdapter extends BaseGameAdapter {
   }
 
   /**
-   * Simple heuristic: move toward nearest enemy if no model available
+   * Terrain-aware heuristic: take the first step on the shortest path toward
+   * the nearest reachable enemy. This avoids getting stuck behind maze walls
+   * when no usable model is available.
    */
   _heuristicMove(me, gameState) {
     const enemies = gameState.agents
@@ -529,6 +545,17 @@ class GcAdapter extends BaseGameAdapter {
 
     const target = enemies[0]
     const actionMask = this.featureBuilder.buildActionMask(me, gameState)
+
+    const pathMove = findShortestMoveDirection(
+      me,
+      enemies,
+      gameState,
+      actionMask,
+      this.featureBuilder.terrain,
+      this.featureBuilder.gridWidth,
+      this.featureBuilder.gridHeight
+    )
+    if (pathMove) return pathMove
 
     // Check if moving in a direction puts us in attack range
     const DIRS = [
@@ -588,7 +615,7 @@ class GcAdapter extends BaseGameAdapter {
     log.info(`Game cancelled: ${this.activeGameId}`, data)
 
     // Drop cancelled session data
-    if (this.dataCollector && this.sessionId) {
+    if (this.dataCollector && this.collectLegacyTraining && this.sessionId) {
       this.dataCollector.dropSession(this.sessionId)
     }
 
@@ -626,13 +653,23 @@ class GcAdapter extends BaseGameAdapter {
 
     // Track equipment performance
     if (this.currentLoadout && myResult) {
+      try {
+        this.dataCollector?.store?.saveLoadoutResult?.(
+          gameId,
+          this.currentLoadout.weapon,
+          this.currentLoadout.armor,
+          myResult
+        )
+      } catch (err) {
+        log.warn(`Failed to persist loadout result: ${err.message}`)
+      }
       this.equipmentManager.recordResult(
         this.currentLoadout.weapon, this.currentLoadout.armor, myResult
       )
     }
 
     // End data collection session
-    if (this.dataCollector && this.sessionId) {
+    if (this.dataCollector && this.collectLegacyTraining && this.sessionId) {
       this.dataCollector.endSession(this.sessionId, myResult, this._strategyLog)
 
       const totalGames = this.dataCollector.getSessionCount(this.gameName)
@@ -664,6 +701,74 @@ class GcAdapter extends BaseGameAdapter {
     if (this.modelRegistry) this.modelRegistry.stopWatcher()
     log.info('GC adapter shut down')
   }
+}
+
+function findShortestMoveDirection(me, targets, gameState, actionMask, terrain, gridW = 8, gridH = 8) {
+  if (!terrain || !targets.length) return null
+
+  const occupied = new Set()
+  for (const a of (gameState.agents || [])) {
+    if (a.alive && a.slot !== me.slot) occupied.add(`${a.x},${a.y}`)
+  }
+
+  const candidates = []
+  for (const target of targets) {
+    occupied.delete(`${target.x},${target.y}`)
+    const path = findShortestPath(me, target, terrain, gridW, gridH, occupied, actionMask)
+    occupied.add(`${target.x},${target.y}`)
+    if (path) candidates.push(path)
+  }
+
+  candidates.sort((a, b) => a.dist - b.dist)
+  return candidates.length > 0 ? ACTION_LABELS[candidates[0].firstActionIdx] : null
+}
+
+function findShortestPath(from, to, terrain, gridW, gridH, occupied, actionMask) {
+  const startKey = `${from.x},${from.y}`
+  const targetKey = `${to.x},${to.y}`
+  if (startKey === targetKey) return null
+
+  const queue = [{ x: from.x, y: from.y, dist: 0, firstActionIdx: null }]
+  const seen = new Set([startKey])
+
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi]
+    for (let actionIdx = 1; actionIdx <= 4; actionIdx++) {
+      if (cur.firstActionIdx == null && !actionMask[actionIdx]) continue
+      const [dx, dy] = actionToDelta(actionIdx)
+      const nx = cur.x + dx
+      const ny = cur.y + dy
+      const key = `${nx},${ny}`
+      if (seen.has(key)) continue
+      if (!isPathPassable(terrain, nx, ny, gridW, gridH, occupied) && key !== targetKey) continue
+
+      const firstActionIdx = cur.firstActionIdx == null ? actionIdx : cur.firstActionIdx
+      const dist = cur.dist + 1
+      if (key === targetKey) return { dist, firstActionIdx }
+
+      seen.add(key)
+      queue.push({ x: nx, y: ny, dist, firstActionIdx })
+    }
+  }
+
+  return null
+}
+
+function actionToDelta(actionIdx) {
+  switch (actionIdx) {
+    case 1: return [0, -1]
+    case 2: return [0, 1]
+    case 3: return [-1, 0]
+    case 4: return [1, 0]
+    default: return [0, 0]
+  }
+}
+
+function isPathPassable(terrain, x, y, gridW, gridH, occupied) {
+  if (x < 0 || x >= gridW || y < 0 || y >= gridH) return false
+  if (occupied.has(`${x},${y}`)) return false
+  const t = terrain?.[y]?.[x] || 0
+  return t !== 1 && t !== 2
 }
 
 module.exports = GcAdapter

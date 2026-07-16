@@ -3,6 +3,13 @@ node_modules/
 .env.local
 .env.*.local
 
+# Local behavior personality configuration
+config/personality.json
+config/personality.effective.json
+config/personality.history/
+config/operation.json
+config/operation.history/
+
 # SQLite databases
 data/*.db
 data/*.db-shm
@@ -11,6 +18,7 @@ data/*.db-wal
 # Trained models
 models/gc/*.onnx
 models/gc/*.onnx.data
+models/gc/generations/
 models/archive/
 
 # Training data (raw exports + processed)

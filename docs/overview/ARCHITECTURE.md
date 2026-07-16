@@ -255,7 +255,6 @@ class BaseGameAdapter {
 | GET | `/games/:id` | 게임 상세 정보 |
 | GET | `/games/:id/state` | 게임 상태 (terrain 등) |
 | POST | `/games/:id/strategy` | 전략 제출 |
-| POST | `/games/:id/move` | 이동 방향 제출 |
 | GET | `/equipment` | 장비 카탈로그 |
 | POST | `/agents/me/model` | ONNX 모델 업로드 (multipart, max 2MB) |
 | DELETE | `/agents/me/model` | 커스텀 모델 삭제 |
@@ -301,8 +300,7 @@ _enterGame(gameId, slot)
 
 _onTick(data) [실시간]
   ├─ 피처 벡터 생성 (162차원)
-  ├─ ONNX 추론 또는 휴리스틱 → 이동 방향 결정
-  ├─ submitMove()
+  ├─ ONNX 추론 또는 휴리스틱 → 이동 방향 결정 기록
   ├─ DataCollector.recordTick()
   └─ 전략 결정 (N틱마다) → submitStrategy()
 

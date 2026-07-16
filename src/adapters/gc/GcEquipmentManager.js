@@ -1,13 +1,28 @@
 const { createLogger } = require('../../utils/logger')
 const log = createLogger('gc-equip')
 
+const DEFAULT_PREFERENCES = Object.freeze({
+  damage: 1,
+  range: 1,
+  speed: 1,
+  defense: 1,
+  evasion: 1,
+  skill: 1,
+  history: 1,
+  exploration: 0.7,
+})
+
 /**
- * GcEquipmentManager — Selects optimal weapon/armor based on historical win rates.
- * Tracks per-loadout performance and adapts over time.
+ * Selects a compatible loadout from personality preferences and historical rank.
+ * Performance remains scoped by the store's operation/profile context.
  */
 class GcEquipmentManager {
-  constructor(store) {
+  constructor(store, behaviorProfile = null) {
     this.store = store
+    this.preferences = {
+      ...DEFAULT_PREFERENCES,
+      ...(behaviorProfile?.equipment || {}),
+    }
     this.catalog = { weapons: [], armors: [] }
     this._stats = new Map() // "weapon:armor" → { games, wins, avgRank, totalScore }
     this._minGamesForStats = 5
@@ -26,35 +41,21 @@ class GcEquipmentManager {
     if (!this.store) return
 
     try {
-      const sessions = this.store.db.prepare(`
-        SELECT result, strategy_log FROM game_sessions
-        WHERE game = 'claw-clash' AND result IS NOT NULL AND result != 'null'
-      `).all()
-
-      for (const s of sessions) {
-        const result = JSON.parse(s.result || '{}')
-        const stratLog = JSON.parse(s.strategy_log || '[]')
-        if (!result.rank) continue
-
-        // Extract loadout from first strategy entry or default
-        const weapon = result.weapon || 'sword'
-        const armor = result.armor || 'leather'
-        const key = `${weapon}:${armor}`
-
-        if (!this._stats.has(key)) {
-          this._stats.set(key, { games: 0, wins: 0, totalRank: 0, totalScore: 0 })
-        }
-        const stat = this._stats.get(key)
-        stat.games++
-        if (result.rank === 1) stat.wins++
-        stat.totalRank += result.rank
-        stat.totalScore += result.score || 0
-      }
+      let results = this.store.getLoadoutResults?.() || []
+      if (results.length === 0) results = this._legacyLoadoutResults()
+      for (const result of results) this.recordResult(result.weapon, result.armor, result)
 
       log.info(`Loaded stats for ${this._stats.size} loadout combinations`)
     } catch (err) {
       log.warn('Failed to load loadout stats', err.message)
     }
+  }
+
+  _legacyLoadoutResults() {
+    if (!this.store.getCompletedSessionResults) return []
+    return this.store.getCompletedSessionResults('claw-clash')
+      .map(session => JSON.parse(session.result || '{}'))
+      .filter(result => result.rank && result.weapon && result.armor)
   }
 
   /**
@@ -73,8 +74,7 @@ class GcEquipmentManager {
   }
 
   /**
-   * Select the best loadout based on historical performance.
-   * Uses UCB1 (Upper Confidence Bound) for exploration vs exploitation.
+   * Select by personality preference plus profile-scoped historical UCB performance.
    */
   selectLoadout() {
     const weapons = this.catalog.weapons.filter(w => w.is_active !== false)
@@ -84,41 +84,60 @@ class GcEquipmentManager {
       return { weapon: 'sword', armor: 'leather', tier: 'basic' }
     }
 
-    const totalGames = Array.from(this._stats.values()).reduce((s, v) => s + v.games, 0)
+    const combinations = []
+    for (const weapon of weapons) {
+      const allowedCategories = weapon.allowed_armors || ['heavy', 'light', 'cloth', 'none']
+      for (const armor of armors.filter(item => allowedCategories.includes(item.category))) {
+        combinations.push({
+          weapon,
+          armor,
+          key: `${weapon.slug}:${armor.slug}`,
+          metrics: rawEquipmentMetrics(weapon, armor),
+        })
+      }
+    }
+    combinations.sort((left, right) => left.key.localeCompare(right.key))
+    if (combinations.length === 0) return { weapon: 'sword', armor: 'leather', tier: 'basic' }
+
+    const ranges = metricRanges(combinations)
+    const totalGames = Array.from(this._stats.values()).reduce((sum, value) => sum + value.games, 0)
 
     let bestScore = -Infinity
     let bestLoadout = null
+    let bestDetails = null
 
-    for (const w of weapons) {
-      const allowedCategories = w.allowed_armors || ['heavy', 'light', 'cloth', 'none']
-      const compatibleArmors = armors.filter(a => allowedCategories.includes(a.category))
+    for (const combination of combinations) {
+      const normalized = normalizeMetrics(combination.metrics, ranges)
+      const preference = weightedPreference(normalized, this.preferences)
+      const stat = this._stats.get(combination.key)
+      const games = stat?.games || 0
+      const performance = stat && stat.games > 0
+        ? clamp((9 - (stat.totalRank / stat.games)) / 8, 0, 1)
+        : 0.5
+      const confidence = Math.min(games / this._minGamesForStats, 1)
+      const history = performance * confidence + 0.5 * (1 - confidence)
+      const exploration = normalizedUcbExploration(totalGames, games)
+      const score = preference + this.preferences.history * history +
+        this.preferences.exploration * exploration
 
-      for (const a of compatibleArmors) {
-        const key = `${w.slug}:${a.slug}`
-        const stat = this._stats.get(key)
-
-        let score
-        if (!stat || stat.games < this._minGamesForStats) {
-          // Unexplored: give high exploration bonus
-          score = 10 + Math.random()
-        } else {
-          // UCB1: avgPerformance + exploration bonus
-          const avgRank = stat.totalRank / stat.games
-          // Lower rank is better, so invert (9 - avgRank) / 8
-          const performance = (9 - avgRank) / 8
-          const exploration = Math.sqrt(2 * Math.log(totalGames + 1) / stat.games)
-          score = performance + exploration
+      if (score > bestScore) {
+        bestScore = score
+        bestLoadout = {
+          weapon: combination.weapon.slug,
+          armor: combination.armor.slug,
+          tier: 'basic',
         }
-
-        if (score > bestScore) {
-          bestScore = score
-          bestLoadout = { weapon: w.slug, armor: a.slug, tier: 'basic' }
-        }
+        bestDetails = { preference, history, exploration, games }
       }
     }
 
     if (bestLoadout) {
-      log.info(`Selected loadout: ${bestLoadout.weapon} + ${bestLoadout.armor} (score: ${bestScore.toFixed(3)})`)
+      log.info(
+        `Selected loadout: ${bestLoadout.weapon} + ${bestLoadout.armor} ` +
+        `(score=${bestScore.toFixed(3)}, preference=${bestDetails.preference.toFixed(3)}, ` +
+        `history=${bestDetails.history.toFixed(3)}, exploration=${bestDetails.exploration.toFixed(3)}, ` +
+        `games=${bestDetails.games})`
+      )
       return bestLoadout
     }
 
@@ -142,6 +161,74 @@ class GcEquipmentManager {
     }
     return summary.sort((a, b) => parseFloat(a.avgRank) - parseFloat(b.avgRank))
   }
+}
+
+function rawEquipmentMetrics(weapon, armor) {
+  const damageMin = finite(weapon.damage_min, weapon.damage, 0)
+  const damageMax = finite(weapon.damage_max, weapon.damage, damageMin)
+  return {
+    damage: (damageMin + damageMax) / 2,
+    range: finite(weapon.range, 0),
+    speed: finite(weapon.speed, 100) + finite(armor.speed_mod, 0),
+    defense: finite(armor.dmg_reduction, 0),
+    evasion: finite(armor.evasion, 0),
+    skill: skillPotential(weapon, (damageMin + damageMax) / 2),
+  }
+}
+
+function skillPotential(weapon, averageDamage) {
+  const skill = weapon.skill
+  if (!skill || typeof skill !== 'object') return 0
+  const chance = clamp(finite(skill.chance, 0.1), 0, 1)
+  let impact = finite(skill.value, 0)
+  if (skill.effect === 'triple_strike') impact = averageDamage * 2
+  if (impact <= 0) impact = averageDamage
+  return chance * impact
+}
+
+function metricRanges(combinations) {
+  const ranges = {}
+  for (const key of ['damage', 'range', 'speed', 'defense', 'evasion', 'skill']) {
+    const values = combinations.map(item => item.metrics[key])
+    ranges[key] = { min: Math.min(...values), max: Math.max(...values) }
+  }
+  return ranges
+}
+
+function normalizeMetrics(metrics, ranges) {
+  const normalized = {}
+  for (const [key, value] of Object.entries(metrics)) {
+    const range = ranges[key]
+    normalized[key] = range.max === range.min ? (value > 0 ? 1 : 0) :
+      (value - range.min) / (range.max - range.min)
+  }
+  return normalized
+}
+
+function weightedPreference(metrics, preferences) {
+  const keys = ['damage', 'range', 'speed', 'defense', 'evasion', 'skill']
+  const weight = keys.reduce((sum, key) => sum + preferences[key], 0)
+  if (weight <= 0) return 0
+  return keys.reduce((sum, key) => sum + metrics[key] * preferences[key], 0) / weight
+}
+
+function normalizedUcbExploration(totalGames, games) {
+  const numerator = 2 * Math.log(totalGames + 2)
+  const maximum = Math.sqrt(numerator)
+  if (maximum === 0) return 0
+  return Math.sqrt(numerator / (games + 1)) / maximum
+}
+
+function finite(...values) {
+  for (const value of values) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value))
 }
 
 module.exports = GcEquipmentManager

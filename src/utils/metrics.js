@@ -22,10 +22,7 @@ class Metrics {
     if (!this.store) return
 
     try {
-      const sessions = this.store.db.prepare(`
-        SELECT result FROM game_sessions
-        WHERE game = ? AND result IS NOT NULL AND result != 'null'
-      `).all(game)
+      const sessions = this.store.getCompletedSessionResults(game)
 
       for (const s of sessions) {
         const r = JSON.parse(s.result || '{}')

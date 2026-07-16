@@ -20,11 +20,44 @@ class ModelRegistry {
       return false
     }
 
+    if (config.runtimeContext) this._validateContract(modelPath, config.runtimeContext)
+
     const provider = new OnnxProvider(key, { featureDim: config.featureDim })
     await provider.load(modelPath)
     this.providers.set(key, provider)
     log.info(`Registered model: ${key}`)
     return true
+  }
+
+  _validateContract(modelPath, expected) {
+    const metaPath = path.join(path.dirname(modelPath), 'meta.json')
+    if (!fs.existsSync(metaPath)) throw new Error(`Model metadata not found: ${metaPath}`)
+
+    let meta
+    try {
+      meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'))
+    } catch (err) {
+      throw new Error(`Invalid model metadata: ${err.message}`)
+    }
+
+    const required = [
+      'operation_version',
+      'feature_version',
+      'feature_schema_hash',
+      'training_version',
+      'behavior_profile_hash',
+    ]
+    for (const key of required) {
+      if (meta[key] !== expected[key]) {
+        throw new Error(`Model contract mismatch: ${key}=${meta[key] || 'missing'}, expected=${expected[key]}`)
+      }
+    }
+    if (meta.input_dim !== expected.feature_dim || meta.output_dim !== expected.output_dim) {
+      throw new Error(
+        `Model shape mismatch: ${meta.input_dim}x${meta.output_dim}, ` +
+        `expected=${expected.feature_dim}x${expected.output_dim}`
+      )
+    }
   }
 
   getProvider(gameKey, modelKey) {

@@ -9,7 +9,7 @@
  *   [22..25]   Strategy (4)
  *   [26..115]  Opponents 6×15 = 90
  *   [116..119] Arena context (4)
- *   [120..143] 8-directional summary: 8 dirs × 3 (wall/enemy/powerup dist) = 24
+ *   [120..143] 8-directional summary: 8 dirs × 3 (wall/path enemy/path powerup dist) = 24
  *   [144..147] Directional move validity (4)
  *   [148..151] Attack possible after move (4)
  *   [152]      Can attack from current pos (1)
@@ -135,9 +135,7 @@ class GcFeatureBuilder {
     vec[idx++] = safe((agent.weapon?.range || 1) / 5)                              // 4
     vec[idx++] = safe((agent.weapon?.cooldown || 0) / 10)                          // 5
     vec[idx++] = safe((agent.effectiveSpeed || 100) / 120)                         // 6
-    // 7: self weapon rangeType — adjacent=0.0, pierce=0.5, ranged=1.0
-    const rt = agent.weapon?.rangeType || 'adjacent'
-    vec[idx++] = rt === 'ranged' ? 1.0 : (rt === 'pierce' ? 0.5 : 0.0)             // 7
+    vec[idx++] = safe((agent.effectiveSpeed || 100) / 120)                         // 7 (unified, same as 6)
     vec[idx++] = safe((agent.armor?.dmgReduction || 0) / 50)                       // 8
     vec[idx++] = safe((agent.armor?.evasion || 0) / 0.5)                           // 9
     vec[idx++] = safe((agent.score || 0) / 1000)                                   // 10
@@ -315,34 +313,36 @@ function buildOccupiedSet(gameState, excludeSlot) {
 }
 
 /**
- * 8-directional ray-cast summary.
- * For each of 8 directions: [wall_dist, nearest_enemy_dist, nearest_powerup_dist]
+ * 8-directional terrain-aware summary.
+ * For each of 8 directions: [wall_dist, nearest_enemy_path_dist, nearest_powerup_path_dist]
  * Returns flat array of 24 values, all normalized to [0, 1].
  */
 function buildDirectionalSummary(agent, enemies, powerups, terrain, gridW, gridH, maxDim) {
   const result = new Array(24).fill(1.0)
 
-  // Assign entities to their closest octant
+  // Assign entities to their visible octant and, when terrain is known, to the
+  // first cardinal step of the shortest path. This preserves the 153-dim model
+  // shape while giving maze/obstacle-aware escape signals.
   const enemyBuckets = new Array(8).fill(null)  // {dist} per direction
   const puBuckets = new Array(8).fill(null)
 
   for (const en of enemies) {
     const dirIdx = getOctant(agent.x, agent.y, en.x, en.y)
     if (dirIdx < 0) continue
-    const dist = manhattan(agent, en)
-    if (!enemyBuckets[dirIdx] || dist < enemyBuckets[dirIdx]) {
-      enemyBuckets[dirIdx] = dist
-    }
+    const path = findShortestPathFirstStep(agent, en, terrain, gridW, gridH)
+    const dist = path ? path.dist : manhattan(agent, en)
+    bucketMin(enemyBuckets, dirIdx, dist)
+    if (path) bucketMin(enemyBuckets, path.firstDirIdx, path.dist)
   }
 
   if (powerups?.length) {
     for (const pu of powerups) {
       const dirIdx = getOctant(agent.x, agent.y, pu.x, pu.y)
       if (dirIdx < 0) continue
-      const dist = manhattan(agent, pu)
-      if (!puBuckets[dirIdx] || dist < puBuckets[dirIdx]) {
-        puBuckets[dirIdx] = dist
-      }
+      const path = findShortestPathFirstStep(agent, pu, terrain, gridW, gridH)
+      const dist = path ? path.dist : manhattan(agent, pu)
+      bucketMin(puBuckets, dirIdx, dist)
+      if (path) bucketMin(puBuckets, path.firstDirIdx, path.dist)
     }
   }
 
@@ -371,6 +371,49 @@ function buildDirectionalSummary(agent, enemies, powerups, terrain, gridW, gridH
   }
 
   return result
+}
+
+function bucketMin(buckets, idx, dist) {
+  if (idx == null || idx < 0) return
+  if (buckets[idx] == null || dist < buckets[idx]) buckets[idx] = dist
+}
+
+function findShortestPathFirstStep(from, to, terrain, gridW, gridH) {
+  if (!terrain) return null
+
+  const startKey = `${from.x},${from.y}`
+  const targetKey = `${to.x},${to.y}`
+  if (startKey === targetKey) return null
+
+  const queue = [{ x: from.x, y: from.y, dist: 0, firstDirIdx: null }]
+  const seen = new Set([startKey])
+
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi]
+    for (let dirIdx = 0; dirIdx < DIRECTIONS.length; dirIdx++) {
+      const { dx, dy } = DIRECTIONS[dirIdx]
+      const nx = cur.x + dx
+      const ny = cur.y + dy
+      const key = `${nx},${ny}`
+      if (seen.has(key)) continue
+      if (!isPassable(terrain, nx, ny, gridW, gridH) && key !== targetKey) continue
+
+      const firstDirIdx = cur.firstDirIdx == null ? dirIdx : cur.firstDirIdx
+      const dist = cur.dist + 1
+      if (key === targetKey) return { dist, firstDirIdx }
+
+      seen.add(key)
+      queue.push({ x: nx, y: ny, dist, firstDirIdx })
+    }
+  }
+
+  return null
+}
+
+function isPassable(terrain, x, y, gridW, gridH) {
+  if (x < 0 || x >= gridW || y < 0 || y >= gridH) return false
+  const t = getTerrain(terrain, x, y)
+  return t !== 1 && t !== 2
 }
 
 /**

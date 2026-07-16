@@ -1,4 +1,5 @@
 const { spawn } = require('child_process')
+const fs = require('fs')
 const path = require('path')
 const { createLogger } = require('../utils/logger')
 const log = createLogger('trainer')
@@ -9,6 +10,9 @@ class TrainingRunner {
     this.outputDir = config.outputDir || './models/gc'
     this.autoTrainAfterGames = config.autoTrainAfterGames || 50
     this.pythonPath = config.pythonPath || process.env.PYTHON_PATH || 'python3'
+    this.runtimeContext = config.runtimeContext
+      ? Object.freeze({ ...config.runtimeContext })
+      : null
     this._running = false
   }
 
@@ -51,8 +55,14 @@ class TrainingRunner {
       proc.on('close', (code) => {
         this._running = false
         if (code === 0) {
-          log.info('Training completed successfully')
-          resolve(true)
+          try {
+            this._writeOperationMetadata()
+            log.info('Training completed successfully')
+            resolve(true)
+          } catch (err) {
+            log.error('Trained model contract validation failed', err.message)
+            resolve(false)
+          }
         } else {
           log.error(`Training failed (exit code ${code})`, stderr.slice(-500))
           resolve(false)
@@ -65,6 +75,30 @@ class TrainingRunner {
         resolve(false)
       })
     })
+  }
+
+  _writeOperationMetadata() {
+    if (!this.runtimeContext) return
+    const metaPath = path.join(this.outputDir, 'meta.json')
+    if (!fs.existsSync(metaPath)) throw new Error(`Metadata not found: ${metaPath}`)
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'))
+    if (meta.input_dim !== this.runtimeContext.feature_dim) {
+      throw new Error(`input_dim=${meta.input_dim}, expected=${this.runtimeContext.feature_dim}`)
+    }
+    if (meta.output_dim !== this.runtimeContext.output_dim) {
+      throw new Error(`output_dim=${meta.output_dim}, expected=${this.runtimeContext.output_dim}`)
+    }
+    const versioned = {
+      ...meta,
+      operation_version: this.runtimeContext.operation_version,
+      feature_version: this.runtimeContext.feature_version,
+      feature_schema_hash: this.runtimeContext.feature_schema_hash,
+      training_version: this.runtimeContext.training_version,
+      behavior_profile_id: this.runtimeContext.behavior_profile_id,
+      behavior_profile_hash: this.runtimeContext.behavior_profile_hash,
+      behavior_profile_revision: this.runtimeContext.behavior_profile_revision,
+    }
+    fs.writeFileSync(metaPath, `${JSON.stringify(versioned, null, 2)}\n`)
   }
 }
 

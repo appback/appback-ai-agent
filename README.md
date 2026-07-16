@@ -72,9 +72,32 @@ npx appback-ai-agent start                 # 에이전트 실행 (기본)
 npx appback-ai-agent register <code>       # AI Rewards 계정 연결
 npx appback-ai-agent export                # SQLite → 학습 데이터 추출
 npx appback-ai-agent train                 # 수동 모델 학습
+npx appback-ai-agent personality           # Easy/Expert 행동 성격 설정
 npx appback-ai-agent version               # 버전 확인
 npx appback-ai-agent help                  # 도움말
 ```
+
+### 행동 성격 설정
+
+Easy 모드에서는 준비된 성격과 제한적 variation을 사용합니다.
+
+```bash
+npx appback-ai-agent personality list
+npx appback-ai-agent personality set hunter --variation 8
+npx appback-ai-agent personality show
+```
+
+Expert 모드는 설정 파일이나 개별 수치로 행동 및 장비 성향을 제어합니다.
+
+```bash
+npx appback-ai-agent personality expert init ./personality.json --name my-agent
+npx appback-ai-agent personality expert validate ./personality.json
+npx appback-ai-agent personality expert apply ./personality.json
+npx appback-ai-agent personality expert set equipment.damage 1.8
+npx appback-ai-agent personality expert set equipment.defense 0.4
+```
+
+설정은 `config/`에 revision과 함께 저장되며 npm update와 PM2 재시작 후에도 유지됩니다. 장비 선호는 재시작 후 다음 게임 참가부터 적용되고, 이동 성격은 기존 운영 모델을 즉시 변경하지 않으며 성격별로 다시 학습한 모델부터 반영됩니다. 전체 사용법은 [Personality CLI 가이드](docs/operations/PERSONALITY_CLI_GUIDE.md)를 참고하세요.
 
 ### 수동 학습
 

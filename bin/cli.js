@@ -14,6 +14,20 @@ if (CMD === 'version' || CMD === '--version' || CMD === '-v') {
   process.exit(0)
 }
 
+// ── personality: behavior profile configuration ──
+if (CMD === 'personality') {
+  const { runPersonalityCommand } = require('./commands/personality')
+  const code = runPersonalityCommand({ args: process.argv.slice(3), cwd: CWD })
+  process.exit(code)
+}
+
+// ── operation: data/model compatibility contract ──
+if (CMD === 'operation') {
+  const { runOperationCommand } = require('./commands/operation')
+  const code = runOperationCommand({ args: process.argv.slice(3), cwd: CWD })
+  process.exit(code)
+}
+
 // ── doctor: 환경 점검 ──
 if (CMD === 'doctor') {
   const { execSync } = require('child_process')
@@ -60,6 +74,21 @@ if (CMD === 'doctor') {
     if (!fs.existsSync(p)) throw new Error('not found — run: appback-ai-agent init')
     return p
   })
+  check('Personality', () => {
+    const { BehaviorProfileStore } = require(path.join(PKG_ROOT, 'src', 'config', 'BehaviorProfileStore'))
+    const current = new BehaviorProfileStore(path.join(CWD, 'config')).getCurrent()
+    const suffix = current.persisted ? `r${current.configured.revision}` : 'default'
+    return `${current.effective.profile_id} (${suffix})`
+  })
+  check('Operation contract', () => {
+    const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
+    const status = new OperationVersionStore(path.join(CWD, 'config')).getStatus()
+    if (!status.initialized) throw new Error('not initialized — run: appback-ai-agent operation activate --yes')
+    if (!status.compatible) {
+      throw new Error(`active=${status.active.operation_version}, binary=${status.binary.operation_version}`)
+    }
+    return `${status.active.operation_version} (${status.active.feature_dim} dimensions)`
+  })
 
   console.log('\n[ Agent ]')
   check('better-sqlite3', () => {
@@ -77,7 +106,15 @@ if (CMD === 'doctor') {
     return `${row.name} (${row.agent_id})`
   })
   check('ONNX model', () => {
-    const p = path.join(CWD, 'models', 'gc', 'gc_strategy_model.onnx')
+    const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
+    const { BehaviorProfileStore } = require(path.join(PKG_ROOT, 'src', 'config', 'BehaviorProfileStore'))
+    const { buildRuntimeContext } = require(path.join(PKG_ROOT, 'src', 'config', 'operationContract'))
+    const operation = new OperationVersionStore(path.join(CWD, 'config')).ensureActive({ initialize: false })
+    const behavior = new BehaviorProfileStore(path.join(CWD, 'config')).getCurrent()
+    process.env._PKG_ROOT = PKG_ROOT
+    process.env._AGENT_CWD = CWD
+    const paths = require(path.join(PKG_ROOT, 'src', 'paths'))
+    const p = path.join(paths.modelGenerationDir(buildRuntimeContext(operation, behavior)), 'gc_move_model.onnx')
     if (!fs.existsSync(p)) throw new Error('not found (will use rule-based)')
     const size = (fs.statSync(p).size / 1024).toFixed(1)
     return `${size} KB`
@@ -160,10 +197,13 @@ if (CMD === 'init') {
     fs.copyFileSync(path.join(PKG_ROOT, '.env.example'), envDest)
     console.log('.env created')
   }
-  for (const dir of ['models', 'data']) {
+  for (const dir of ['models', 'data', 'config']) {
     const p = path.join(CWD, dir)
     if (!fs.existsSync(p)) { fs.mkdirSync(p, { recursive: true }); console.log(`${dir}/ created`) }
   }
+  const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
+  const operation = new OperationVersionStore(path.join(CWD, 'config')).ensureActive()
+  console.log(`Operation contract initialized: ${operation.operation_version}`)
   console.log('\nReady! Run: npx appback-ai-agent start')
   process.exit(0)
 }
@@ -238,6 +278,14 @@ if (CMD === 'register') {
 
 // ── export: 학습 데이터 재추출 ──
 if (CMD === 'export') {
+  const exportArgs = process.argv.slice(3)
+  const unknownExportArgs = exportArgs.filter(arg => arg !== '--reuse-observations')
+  if (unknownExportArgs.length > 0) {
+    console.error(`Unknown export option: ${unknownExportArgs[0]}`)
+    console.error('Usage: npx appback-ai-agent export [--reuse-observations]')
+    process.exit(1)
+  }
+  const reuseObservations = exportArgs.includes('--reuse-observations')
   const envPath = path.join(CWD, '.env')
   if (fs.existsSync(envPath)) require('dotenv').config({ path: envPath })
   else require('dotenv').config()
@@ -247,11 +295,22 @@ if (CMD === 'export') {
   const paths = require(path.join(PKG_ROOT, 'src', 'paths'))
   const SqliteStore = require(path.join(PKG_ROOT, 'src', 'data', 'storage', 'SqliteStore'))
   const TrainingExporter = require(path.join(PKG_ROOT, 'src', 'data', 'exporters', 'TrainingExporter'))
+  const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
+  const { BehaviorProfileStore } = require(path.join(PKG_ROOT, 'src', 'config', 'BehaviorProfileStore'))
+  const { buildRuntimeContext } = require(path.join(PKG_ROOT, 'src', 'config', 'operationContract'))
 
   const dataDir = paths.dataDir()
-  const exportDir = paths.trainingDataDir()
-  const store = new SqliteStore(dataDir)
-  const exporter = new TrainingExporter(store, exportDir)
+  const operation = new OperationVersionStore(paths.configDir()).ensureActive()
+  const behavior = new BehaviorProfileStore(paths.configDir()).getCurrent()
+  const runtimeContext = buildRuntimeContext(operation, behavior)
+  const exportDir = paths.trainingDataDir(runtimeContext)
+  const store = new SqliteStore(dataDir, runtimeContext)
+  const exporter = new TrainingExporter(store, exportDir, runtimeContext, behavior.effective, {
+    reuseObservations,
+  })
+  if (reuseObservations) {
+    console.log('Observation policy: reuse prior-profile raw frames and relabel all samples with the current personality')
+  }
   const result = exporter.exportForTraining('claw-clash', 1)
   store.close()
 
@@ -272,27 +331,24 @@ if (CMD === 'train') {
   process.env._PKG_ROOT = PKG_ROOT
   process.env._AGENT_CWD = CWD
   const paths = require(path.join(PKG_ROOT, 'src', 'paths'))
-  const { spawn: spawnProc } = require('child_process')
+  const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
+  const { BehaviorProfileStore } = require(path.join(PKG_ROOT, 'src', 'config', 'BehaviorProfileStore'))
+  const { buildRuntimeContext } = require(path.join(PKG_ROOT, 'src', 'config', 'operationContract'))
+  const TrainingRunner = require(path.join(PKG_ROOT, 'src', 'core', 'TrainingRunner'))
+  const operation = new OperationVersionStore(paths.configDir()).ensureActive()
+  const behavior = new BehaviorProfileStore(paths.configDir()).getCurrent()
+  const runtimeContext = buildRuntimeContext(operation, behavior)
+  const dataDir = paths.trainingDataDir(runtimeContext)
+  const outputDir = paths.modelGenerationDir(runtimeContext)
   const pythonPath = process.env.PYTHON_PATH || 'python3'
-
-  const dataDir = paths.trainingDataDir()
-  const outputDir = path.join(paths.modelDir(), 'gc')
 
   console.log(`Python: ${pythonPath}`)
   console.log(`Data:   ${dataDir}`)
   console.log(`Output: ${outputDir}`)
   console.log()
 
-  const proc = spawnProc(pythonPath, [paths.trainingScript(), '--data-dir', dataDir, '--output-dir', outputDir], {
-    stdio: 'inherit',
-    env: { ...process.env, PYTHONPATH: paths.trainingRoot() },
-  })
-  proc.on('close', (code) => process.exit(code || 0))
-  proc.on('error', (err) => {
-    console.error(`Failed to start python: ${err.message}`)
-    console.error(`Set PYTHON_PATH in .env to your venv python path`)
-    process.exit(1)
-  })
+  const trainer = new TrainingRunner({ dataDir, outputDir, pythonPath, runtimeContext })
+  trainer.run('claw-clash').then(success => process.exit(success ? 0 : 1))
   return
 }
 
@@ -339,8 +395,11 @@ Usage:
   npx appback-ai-agent init                  Create .env and directories
   npx appback-ai-agent start                 Start the agent (default)
   npx appback-ai-agent register <code>       Link agent to AI Rewards account
-  npx appback-ai-agent export                Export training data from DB
+  npx appback-ai-agent export [--reuse-observations]
+                                             Export profile-isolated training data
   npx appback-ai-agent train                 Run model training manually
+  npx appback-ai-agent personality           Configure AI behavior personality
+  npx appback-ai-agent operation             Manage data/model operation contract
   npx appback-ai-agent version               Show version
   npx appback-ai-agent help                  Show this help
 
@@ -357,6 +416,17 @@ Training (requires Python):
   python3 -m venv .venv && source .venv/bin/activate
   pip install -r node_modules/appback-ai-agent/training/requirements.txt
   echo 'PYTHON_PATH=.venv/bin/python3' >> .env
+
+Personality:
+  npx appback-ai-agent personality list
+  npx appback-ai-agent personality set hunter --variation 8
+  npx appback-ai-agent personality show
+  npx appback-ai-agent personality expert help
+
+Operation versioning:
+  npx appback-ai-agent operation show
+  npx appback-ai-agent operation verify
+  npx appback-ai-agent operation activate v8 --yes
 
 AI Rewards registration:
   1. Go to https://rewards.appback.app → My AI Agents → Register Agent

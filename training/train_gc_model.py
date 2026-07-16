@@ -1,5 +1,5 @@
 """
-train_gc_model.py — Train GC move model from collected game data (v2).
+train_gc_model.py — Train GC move model from versioned v7/v8 data.
 
 Tick-level reward + label correction based on actual game mechanics.
 
@@ -10,6 +10,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
 
 import numpy as np
@@ -58,6 +59,7 @@ DIR_TO_LABEL = {'up': 1, 'down': 2, 'left': 3, 'right': 4}
 def load_data(data_dir):
     sessions_path = os.path.join(data_dir, "claw-clash_sessions.json")
     ticks_path = os.path.join(data_dir, "claw-clash_ticks.csv")
+    manifest_path = os.path.join(data_dir, "operation-manifest.json")
 
     if not os.path.exists(sessions_path) or not os.path.exists(ticks_path):
         print(f"Data files not found in {data_dir}")
@@ -65,10 +67,14 @@ def load_data(data_dir):
 
     with open(sessions_path) as f:
         sessions = json.load(f)
+    manifest = {}
+    if os.path.exists(manifest_path):
+        with open(manifest_path) as f:
+            manifest = json.load(f)
 
     ticks_df = pd.read_csv(ticks_path)
     print(f"Loaded {len(sessions)} sessions, {len(ticks_df)} tick records")
-    return sessions, ticks_df
+    return sessions, ticks_df, manifest
 
 
 def compute_tick_reward(features, action_idx, session_result):
@@ -172,21 +178,25 @@ def correct_label(features, original_label):
     return original_label
 
 
-def build_labels(sessions, ticks_df):
+def build_labels(sessions, ticks_df, manifest):
     features_list = []
     labels_list = []
     weights_list = []
 
+    feature_version = str(manifest.get("feature_version", "7.0"))
+    feature_dim = int(manifest.get("feature_dim", 192 if feature_version == "8.0" else 153))
+    is_v8 = feature_version == "8.0"
     session_results = {}
     for s in sessions:
         if s.get("result"):
-            session_results[s["id"]] = s["result"]
+            session_key = s.get("session_id") if is_v8 else s.get("id")
+            session_results[str(session_key)] = s["result"]
 
     skipped = 0
     corrected = 0
 
     for _, row in ticks_df.iterrows():
-        sid = int(row["session_id"])
+        sid = str(row["session_id"])
         if sid not in session_results:
             continue
 
@@ -201,19 +211,24 @@ def build_labels(sessions, ticks_df):
         original_label = ACTION_TO_IDX[action_str]
         result = session_results[sid]
 
-        f_cols = [c for c in ticks_df.columns if c.startswith("f")]
+        f_cols = [c for c in ticks_df.columns if re.fullmatch(r"f\d+", c)]
         features = row[f_cols].values.astype(np.float32)
 
-        if len(features) != 153:
+        if len(features) != feature_dim or not np.isfinite(features).all():
             continue
 
-        # Label correction
-        label = correct_label(features, original_label)
-        if label != original_label:
-            corrected += 1
-
-        # Tick-level reward
-        reward = compute_tick_reward(features, label, result)
+        if is_v8:
+            # v8 action is already the profile-aware BFS teacher label.
+            label = original_label
+            reward = float(row.get("sample_weight", 1.0))
+            if not np.isfinite(reward) or reward <= 0:
+                skipped += 1
+                continue
+        else:
+            label = correct_label(features, original_label)
+            if label != original_label:
+                corrected += 1
+            reward = compute_tick_reward(features, label, result)
 
         features_list.append(features)
         labels_list.append(label)
@@ -240,8 +255,10 @@ def build_labels(sessions, ticks_df):
 
 
 def train(X, y, w, epochs=80, batch_size=128, lr=0.001):
+    labels, counts = np.unique(y, return_counts=True)
+    stratify = y if len(labels) > 1 and counts.min() >= 2 else None
     X_train, X_val, y_train, y_val, w_train, w_val = train_test_split(
-        X, y, w, test_size=0.2, random_state=42, stratify=y
+        X, y, w, test_size=0.2, random_state=42, stratify=stratify
     )
 
     train_ds = TensorDataset(
@@ -305,7 +322,7 @@ def train(X, y, w, epochs=80, batch_size=128, lr=0.001):
     return model, best_val_acc, input_dim
 
 
-def export_onnx(model, output_dir, val_acc, input_dim):
+def export_onnx(model, output_dir, val_acc, input_dim, manifest):
     import onnx
 
     os.makedirs(output_dir, exist_ok=True)
@@ -332,15 +349,22 @@ def export_onnx(model, output_dir, val_acc, input_dim):
         print(f"ONNX model exported: {onnx_path}")
 
     meta = {
-        "version": 2,
+        "version": 3,
         "model": "gc_move_net",
         "input_dim": input_dim,
         "output_dim": 5,
-        "feature_version": "7.0",
-        "training_version": "v2_tick_reward",
+        "feature_version": str(manifest.get("feature_version", "7.0")),
+        "training_version": str(manifest.get("training_version", "v2_tick_reward")),
         "val_accuracy": round(val_acc, 4),
         "action_labels": ACTION_LABELS,
     }
+    for key in [
+        "operation_version", "feature_schema_hash", "behavior_profile_id",
+        "behavior_profile_hash", "behavior_profile_revision", "dataset_manifest_hash",
+        "dataset_session_count", "dataset_session_from", "dataset_session_to",
+    ]:
+        if key in manifest:
+            meta[key] = manifest[key]
     meta_path = os.path.join(output_dir, "meta.json")
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
@@ -358,11 +382,11 @@ def main():
     parser.add_argument("--lr", type=float, default=0.001)
     args = parser.parse_args()
 
-    print("=== GC Move Model Training v2 ===")
-    sessions, ticks_df = load_data(args.data_dir)
-    X, y, w = build_labels(sessions, ticks_df)
+    print("=== GC Move Model Training v3 ===")
+    sessions, ticks_df, manifest = load_data(args.data_dir)
+    X, y, w = build_labels(sessions, ticks_df, manifest)
     model, val_acc, input_dim = train(X, y, w, args.epochs, args.batch_size, args.lr)
-    export_onnx(model, args.output_dir, val_acc, input_dim)
+    export_onnx(model, args.output_dir, val_acc, input_dim, manifest)
     print("=== Training complete ===")
 
 
