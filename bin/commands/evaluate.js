@@ -5,6 +5,7 @@ const { compileProfile } = require('../../src/config/ProfileCompiler')
 const { PRESETS } = require('../../src/config/personalityPresets')
 const { GcV8Teacher } = require('../../src/training/GcV8Teacher')
 const { GcMazeEvaluator } = require('../../src/evaluation/GcMazeEvaluator')
+const { GcPersonalityEvaluator } = require('../../src/evaluation/GcPersonalityEvaluator')
 
 function runEvaluateCommand(options = {}) {
   const args = options.args || []
@@ -18,12 +19,32 @@ function runEvaluateCommand(options = {}) {
       out(helpText())
       return 0
     }
-    if (command !== 'maze') throw new Error(`Unknown evaluation: ${command}`)
-    return evaluateMaze(args.slice(1), cwd, out)
+    if (command === 'maze') return evaluateMaze(args.slice(1), cwd, out)
+    if (command === 'personality') return evaluatePersonality(args.slice(1), cwd, out)
+    throw new Error(`Unknown evaluation: ${command}`)
   } catch (err) {
     stderr.write(`Error: ${err.message}\n`)
     return 1
   }
+}
+
+function evaluatePersonality(args, cwd, out) {
+  assertOptions(args, ['--output', '--json'])
+  const report = new GcPersonalityEvaluator().evaluate()
+  const outputArg = stringOption(args, '--output', null)
+  const outputPath = path.resolve(cwd, outputArg || path.join('reports', 'evaluation', 'personality-differentiation.json'))
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+  fs.writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`)
+  if (args.includes('--json')) out(JSON.stringify({ ...report, report_path: outputPath }, null, 2))
+  else {
+    out('Personality differentiation evaluation')
+    out(`Profiles:          ${Object.keys(report.profiles).join(', ')}`)
+    out(`Scenarios:         ${report.configuration.scenario_count}`)
+    out(`Unique signatures: ${report.metrics.unique_signature_count}`)
+    out(`Result:            ${report.passed ? 'PASS' : 'FAIL'}`)
+    out(`Report:            ${outputPath}`)
+  }
+  return report.passed ? 0 : 2
 }
 
 function evaluateMaze(args, cwd, out) {
@@ -95,9 +116,11 @@ function helpText() {
   return `Evaluation commands:
   evaluate maze [--preset name] [--scenarios 1-10000] [--seed number]
                 [--output file] [--json]
+  evaluate personality [--output file] [--json]
 
 Example:
-  npx appback-ai-agent evaluate maze --preset navigator --scenarios 200`
+  npx appback-ai-agent evaluate maze --preset navigator --scenarios 200
+  npx appback-ai-agent evaluate personality`
 }
 
 module.exports = { runEvaluateCommand }

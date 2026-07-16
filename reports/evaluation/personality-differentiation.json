@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "evaluator_version": "gc-personality-v1",
+  "configuration": {
+    "variation_percent": 0,
+    "seed": 1,
+    "scenario_count": 4
+  },
+  "scenarios": [
+    "low_hp_enemy",
+    "enemy_or_powerup",
+    "healthy_enemy",
+    "visited_fork"
+  ],
+  "profiles": {
+    "balanced": {
+      "hash": "sha256:7537bf9b7f61e60f201b6d0587358ad8040a6265c7838caaa824c14153e79edb",
+      "decisions": [
+        {
+          "scenario": "low_hp_enemy",
+          "action": "left",
+          "reason": "low_hp_flee",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "enemy_or_powerup",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "healthy_enemy",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "visited_fork",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        }
+      ],
+      "signature": "left:low_hp_flee:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy"
+    },
+    "hunter": {
+      "hash": "sha256:620be1e29336e412f47f9151891cc6bd8fe45d68c6593a54b2c97c9906c0297c",
+      "decisions": [
+        {
+          "scenario": "low_hp_enemy",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "enemy_or_powerup",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "healthy_enemy",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "visited_fork",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        }
+      ],
+      "signature": "right:path_to_enemy:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy"
+    },
+    "survivor": {
+      "hash": "sha256:43b583f2d9de49559dff2aa92edd3ae80db8681c23441c236aac32971824f88a",
+      "decisions": [
+        {
+          "scenario": "low_hp_enemy",
+          "action": "left",
+          "reason": "low_hp_flee",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "enemy_or_powerup",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "healthy_enemy",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "visited_fork",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        }
+      ],
+      "signature": "left:low_hp_flee:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy"
+    },
+    "collector": {
+      "hash": "sha256:551abf4d3776c890a6b0fca5b01fc4c033b13b3b8093f220451ac203d28f7984",
+      "decisions": [
+        {
+          "scenario": "low_hp_enemy",
+          "action": "left",
+          "reason": "low_hp_flee",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "enemy_or_powerup",
+          "action": "up",
+          "reason": "path_to_powerup",
+          "target_kind": "powerup"
+        },
+        {
+          "scenario": "healthy_enemy",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "visited_fork",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        }
+      ],
+      "signature": "left:low_hp_flee:enemy|up:path_to_powerup:powerup|right:path_to_enemy:enemy|right:path_to_enemy:enemy"
+    },
+    "navigator": {
+      "hash": "sha256:9e99144dea6921405beadd92cae0824abfceac8405f96635427eaf9f4165eb73",
+      "decisions": [
+        {
+          "scenario": "low_hp_enemy",
+          "action": "left",
+          "reason": "low_hp_flee",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "enemy_or_powerup",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "healthy_enemy",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        },
+        {
+          "scenario": "visited_fork",
+          "action": "right",
+          "reason": "path_to_enemy",
+          "target_kind": "enemy"
+        }
+      ],
+      "signature": "left:low_hp_flee:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy|right:path_to_enemy:enemy"
+    }
+  },
+  "pairwise": [
+    {
+      "profiles": [
+        "balanced",
+        "hunter"
+      ],
+      "action_difference_rate": 0.25,
+      "decision_difference_rate": 0.25
+    },
+    {
+      "profiles": [
+        "balanced",
+        "survivor"
+      ],
+      "action_difference_rate": 0,
+      "decision_difference_rate": 0
+    },
+    {
+      "profiles": [
+        "balanced",
+        "collector"
+      ],
+      "action_difference_rate": 0.25,
+      "decision_difference_rate": 0.25
+    },
+    {
+      "profiles": [
+        "balanced",
+        "navigator"
+      ],
+      "action_difference_rate": 0,
+      "decision_difference_rate": 0
+    },
+    {
+      "profiles": [
+        "hunter",
+        "survivor"
+      ],
+      "action_difference_rate": 0.25,
+      "decision_difference_rate": 0.25
+    },
+    {
+      "profiles": [
+        "hunter",
+        "collector"
+      ],
+      "action_difference_rate": 0.5,
+      "decision_difference_rate": 0.5
+    },
+    {
+      "profiles": [
+        "hunter",
+        "navigator"
+      ],
+      "action_difference_rate": 0.25,
+      "decision_difference_rate": 0.25
+    },
+    {
+      "profiles": [
+        "survivor",
+        "collector"
+      ],
+      "action_difference_rate": 0.25,
+      "decision_difference_rate": 0.25
+    },
+    {
+      "profiles": [
+        "survivor",
+        "navigator"
+      ],
+      "action_difference_rate": 0,
+      "decision_difference_rate": 0
+    },
+    {
+      "profiles": [
+        "collector",
+        "navigator"
+      ],
+      "action_difference_rate": 0.25,
+      "decision_difference_rate": 0.25
+    }
+  ],
+  "metrics": {
+    "unique_signature_count": 3
+  },
+  "gates": {
+    "hunter_pursues_when_survivor_flees": true,
+    "collector_prefers_powerup_over_hunter": true,
+    "at_least_three_unique_signatures": true
+  },
+  "passed": true
+}

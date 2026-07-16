@@ -104,6 +104,7 @@ npx appback-ai-agent personality expert set equipment.defense 0.4
 
 ```bash
 npx appback-ai-agent evaluate maze --preset navigator --scenarios 200 --seed 20260716
+npx appback-ai-agent evaluate personality
 ```
 
 동일 seed에서 항상 같은 solvable maze를 생성해 목표 도달률, 경로 효율, loop, invalid action과 무진행률을 평가합니다. 현재 단계에서는 BFS teacher 기준선 평가이며 ONNX 모델 평가는 후속 단계입니다. 전체 사용법은 [평가 가이드](docs/operations/EVALUATION_GUIDE.md)를 참고하세요.

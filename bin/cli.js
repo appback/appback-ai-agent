@@ -405,7 +405,7 @@ Usage:
   npx appback-ai-agent export [--reuse-observations]
                                              Export profile-isolated training data
   npx appback-ai-agent train                 Run model training manually
-  npx appback-ai-agent evaluate maze         Run deterministic maze quality gates
+  npx appback-ai-agent evaluate              Run maze/personality quality gates
   npx appback-ai-agent personality           Configure AI behavior personality
   npx appback-ai-agent operation             Manage data/model operation contract
   npx appback-ai-agent version               Show version
@@ -427,6 +427,7 @@ Training (requires Python):
 
 Evaluation:
   npx appback-ai-agent evaluate maze --preset navigator --scenarios 200
+  npx appback-ai-agent evaluate personality
 
 Personality:
   npx appback-ai-agent personality list

@@ -31,6 +31,26 @@ npx appback-ai-agent evaluate maze
 reports/evaluation/maze-<profile-id>.json
 ```
 
+## 성격 차별성 평가
+
+```bash
+npx appback-ai-agent evaluate personality
+```
+
+고정 전투 fixture에서 Easy 5개 profile의 action, reason과 target 종류를 비교한다.
+
+현재 gate:
+
+- low HP 적 조우에서 hunter는 추격하고 survivor는 도주
+- 적과 powerup을 함께 제시하면 hunter는 적, collector는 powerup 우선
+- 전체 profile에서 최소 3개 고유 decision signature 생성
+
+기본 보고서:
+
+```text
+reports/evaluation/personality-differentiation.json
+```
+
 ## 자동화 출력
 
 ```bash
@@ -77,3 +97,5 @@ no_progress_rate:   0.000
 ```
 
 저장된 기준 보고서: `reports/evaluation/maze-navigator.json`
+
+성격 차별성 기준 보고서: `reports/evaluation/personality-differentiation.json`
