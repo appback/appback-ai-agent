@@ -66,6 +66,30 @@ test('loadout profile context is gated by the server capability', async () => {
   assert.equal(instance._getLoadoutProfileContext(), null)
 })
 
+test('v8.1 contract preflight fails closed without the strategy capability', async () => {
+  const { instance } = adapter('8.1')
+  instance.api.getAgentContract = async () => ({
+    protocol_version: 1,
+    enforcement: 'observe',
+    accepted_feature_versions: ['7.0', '8.0', '8.1'],
+    capabilities: { strategy_v8_1: false },
+  })
+  await assert.rejects(instance._checkServerContract(), /v8\.1 contract preflight failed/)
+
+  instance.api.getAgentContract = async () => {
+    throw new Error('connection refused')
+  }
+  await assert.rejects(instance._checkServerContract(), /connection refused/)
+
+  instance.api.getAgentContract = async () => ({
+    protocol_version: 1,
+    enforcement: 'observe',
+    accepted_feature_versions: ['7.0', '8.0', '8.1'],
+    capabilities: { strategy_v8_1: true },
+  })
+  await assert.doesNotReject(instance._checkServerContract())
+})
+
 test('join submits the complete profile tuple only to supporting servers', async () => {
   const supported = adapter('8.0').instance
   supported.serverCapabilities = Object.freeze({ loadout_profile_context: true })

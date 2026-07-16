@@ -64,7 +64,7 @@ npx appback-ai-agent start
 
 `activate v8 --yes`는 이전 계약을 `config/operation.history/`에 보관하고 v8 계약을 활성화한다. 기존 데이터나 모델을 삭제하지 않지만 새 운영 세대에서는 조회하거나 로드하지 않는다.
 
-v8.1 Round 6 격리 테스트에서는 테스트 agent에서만 다음을 사용한다. GC `/agent-contract`가 `8.1`을 광고하고 canonical schema hash가 일치하기 전에는 실행하지 않는다.
+v8.1 Round 6 격리 테스트에서는 테스트 agent에서만 다음을 사용한다. GC `/agent-contract`가 `8.1`을 광고하고 `capabilities.strategy_v8_1=true`를 반환하며 canonical schema hash가 일치하기 전에는 실행하지 않는다. v8.1은 observe 모드에서도 capability가 없으면 시작을 중단한다. 이는 feature 번호만 먼저 광고된 불완전한 서버에서 전략 모델을 실행하지 않기 위한 예외적인 fail-closed 규칙이다.
 
 ```bash
 npx appback-ai-agent operation activate v81 --yes

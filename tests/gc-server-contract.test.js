@@ -7,6 +7,8 @@ const GcApiClient = require('../src/adapters/gc/GcApiClient')
 const packageVersion = require('../package.json').version
 const {
   LOADOUT_PROFILE_CAPABILITY,
+  STRATEGY_V81_CAPABILITY,
+  assertRequiredRuntimeCapabilities,
   buildAgentHeaders,
   createClientContract,
   createLoadoutProfileContext,
@@ -14,6 +16,37 @@ const {
   isVersionAtLeast,
   validateLoadoutProfileContext,
 } = require('../src/config/GcServerContract')
+
+test('v8.1 requires the explicit strategy runtime capability even in observe mode', () => {
+  const client = createClientContract('2.2.1', '8.1')
+  const withoutCapability = evaluateServerContract({
+    protocol_version: 1,
+    enforcement: 'observe',
+    accepted_feature_versions: ['7.0', '8.0', '8.1'],
+    capabilities: { strategy_v8_1: false },
+  }, client)
+
+  assert.throws(
+    () => assertRequiredRuntimeCapabilities(withoutCapability, client),
+    /strategy v8\.1 capability is required/
+  )
+
+  const ready = evaluateServerContract({
+    protocol_version: 1,
+    enforcement: 'observe',
+    accepted_feature_versions: ['7.0', '8.0', '8.1'],
+    capabilities: { strategy_v8_1: true },
+  }, client)
+  assert.doesNotThrow(() => assertRequiredRuntimeCapabilities(ready, client))
+  assert.equal(STRATEGY_V81_CAPABILITY, 'strategy_v8_1')
+
+  const v8 = evaluateServerContract({
+    protocol_version: 1,
+    enforcement: 'observe',
+    accepted_feature_versions: ['8.0'],
+  }, createClientContract('2.2.1', '8.0'))
+  assert.doesNotThrow(() => assertRequiredRuntimeCapabilities(v8, createClientContract('2.2.1', '8.0')))
+})
 
 test('v7 bridge sends the deployed protocol and agent version headers', () => {
   const contract = createClientContract(packageVersion, '7.0')

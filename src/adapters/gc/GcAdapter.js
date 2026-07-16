@@ -8,6 +8,8 @@ const { createLogger } = require('../../utils/logger')
 const { INACTIVE_STATES } = require('./constants')
 const {
   LOADOUT_PROFILE_CAPABILITY,
+  STRATEGY_V81_CAPABILITY,
+  assertRequiredRuntimeCapabilities,
   createClientContract,
   createLoadoutProfileContext,
   evaluateServerContract,
@@ -136,14 +138,19 @@ class GcAdapter extends BaseGameAdapter {
     try {
       const serverContract = await this.api.getAgentContract()
       const status = evaluateServerContract(serverContract, this.clientContract)
+      assertRequiredRuntimeCapabilities(status, this.clientContract)
       this.serverCapabilities = status.capabilities
       log.info(
         `GC contract: protocol=${serverContract.protocol_version}, ` +
         `enforcement=${status.enforcement}, feature=${this.clientContract.feature_version}, ` +
-        `loadoutProfile=${this.serverCapabilities[LOADOUT_PROFILE_CAPABILITY] === true}`
+        `loadoutProfile=${this.serverCapabilities[LOADOUT_PROFILE_CAPABILITY] === true}, ` +
+        `strategyV81=${this.serverCapabilities[STRATEGY_V81_CAPABILITY] === true}`
       )
       for (const warning of status.warnings) log.warn(`GC observe contract warning: ${warning}`)
     } catch (err) {
+      if (this.clientContract.feature_version === '8.1') {
+        throw new Error(`GC v8.1 contract preflight failed: ${err.message}`)
+      }
       if (String(err.message).includes('GC strict contract rejected')) throw err
       log.warn(`GC contract preflight unavailable, continuing for compatibility: ${err.message}`)
     }
