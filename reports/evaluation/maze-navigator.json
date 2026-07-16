@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "evaluator_version": "gc-maze-v1",
+  "policy": "bfs_teacher",
+  "profile": {
+    "id": "navigator",
+    "hash": "sha256:9e99144dea6921405beadd92cae0824abfceac8405f96635427eaf9f4165eb73"
+  },
+  "configuration": {
+    "scenario_count": 200,
+    "seed": 20260716,
+    "width": 15,
+    "height": 15
+  },
+  "thresholds": {
+    "goal_reach_rate_min": 0.95,
+    "path_efficiency_max": 1.25,
+    "loop_rate_max": 0.02,
+    "invalid_action_rate_max": 0
+  },
+  "metrics": {
+    "goal_reach_rate": 1,
+    "path_efficiency": 1,
+    "loop_rate": 0,
+    "invalid_action_rate": 0,
+    "no_progress_rate": 0,
+    "average_actions": 71.92,
+    "average_optimal_actions": 71.92
+  },
+  "gates": {
+    "goal_reach_rate": true,
+    "path_efficiency": true,
+    "loop_rate": true,
+    "invalid_action_rate": true
+  },
+  "passed": true,
+  "failed_scenarios": []
+}

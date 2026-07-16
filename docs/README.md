@@ -38,6 +38,7 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 - [TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md) — 트러블슈팅 가이드
 - [PERSONALITY_CLI_GUIDE.md](operations/PERSONALITY_CLI_GUIDE.md) — Easy/Expert 성격 설정 CLI 가이드
 - [OPERATION_VERSION_GUIDE.md](operations/OPERATION_VERSION_GUIDE.md) — 데이터·모델 운영 버전 격리 및 전환 가이드
+- [EVALUATION_GUIDE.md](operations/EVALUATION_GUIDE.md) — 재현 가능한 미로 평가와 품질 게이트 운영 가이드
 
 ### Design (설계)
 - [MODEL_UPLOAD.md](design/MODEL_UPLOAD.md) — ONNX 모델 업로드 설계

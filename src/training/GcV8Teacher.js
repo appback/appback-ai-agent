@@ -123,12 +123,14 @@ function rankMoves(me, goals, mask, context, objective) {
     const visits = context.visits.get(key(move.x, move.y)) || 0
     return {
       ...move,
+      distance,
       score: Number.isFinite(distance)
         ? -distance * number(objective.path_progress, 1) - visits * number(objective.anti_stuck, 1.2) +
           number(objective.exploration, 0.4) / (1 + visits)
         : -Infinity,
     }
-  }).filter(move => Number.isFinite(move.score)).sort(compareMoves)
+  }).filter(move => Number.isFinite(move.distance))
+    .sort((left, right) => left.distance - right.distance || compareMoves(left, right))
 }
 
 function shortestDistance(start, goals, context) {
@@ -190,10 +192,11 @@ function leastVisitedMove(me, mask, visits) {
 }
 
 function chooseDeterministic(ranked, frameId, profileHash, explorationRate) {
-  if (ranked.length < 2 || explorationRate <= 0) return ranked[0]
+  const equallyShort = ranked.filter(move => move.distance === ranked[0].distance)
+  if (equallyShort.length < 2 || explorationRate <= 0) return ranked[0]
   const digest = crypto.createHash('sha256').update(`${frameId}:${profileHash || ''}`).digest()
   const random = digest.readUInt32BE(0) / 0xffffffff
-  return random < explorationRate ? ranked[1] : ranked[0]
+  return random < explorationRate ? equallyShort[1] : equallyShort[0]
 }
 
 function compareMoves(left, right) {

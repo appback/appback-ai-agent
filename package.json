@@ -12,6 +12,7 @@
     "config/",
     "docs/operations/PERSONALITY_CLI_GUIDE.md",
     "docs/operations/OPERATION_VERSION_GUIDE.md",
+    "docs/operations/EVALUATION_GUIDE.md",
     "docs/design/GC_TRAINING_DATA_INTEGRATION.md",
     "training/*.py",
     "training/*.txt",
