@@ -143,15 +143,30 @@ test('personality changes strategy and primary target on the same canonical stat
   assert.notEqual(decisions.hunter.teacher_strategy, decisions.survivor.teacher_strategy)
 })
 
-test('strategy teacher breaks an observed movement loop before scoring another attack', () => {
+test('strategy teacher rotates resolvers instead of reinforcing an observed movement loop', () => {
   const behavior = profile('hunter')
   const loopFrame = frame(behavior)
   loopFrame.input.feature_vector[191] = 0.5
   const sample = new GcStrategyV81Teacher(behavior).buildSample(loopFrame, session(behavior))
   assert.equal(loopFrame.input.strategy_mask[3], 1)
-  assert.equal(sample.teacher_strategy, 'explore')
+  assert.equal(loopFrame.history_before.previous_strategy, 'explore')
+  assert.equal(sample.teacher_strategy, 'flee')
   assert.equal(sample.teacher_target_slot, null)
-  assert.equal(sample.teacher_reason, 'profile_break_loop')
+  assert.equal(sample.teacher_reason, 'profile_break_loop_flee')
+
+  const fleeLoopFrame = structuredClone(loopFrame)
+  fleeLoopFrame.history_before.previous_strategy = 'flee'
+  const attackSample = new GcStrategyV81Teacher(behavior).buildSample(fleeLoopFrame, session(behavior))
+  assert.equal(attackSample.teacher_strategy, 'attack_candidate_0')
+  assert.equal(attackSample.teacher_target_slot, 0)
+  assert.equal(attackSample.teacher_reason, 'profile_break_loop_attack')
+
+  const attackLoopFrame = structuredClone(loopFrame)
+  attackLoopFrame.history_before.previous_strategy = 'attack_candidate_0'
+  const exploreSample = new GcStrategyV81Teacher(behavior).buildSample(attackLoopFrame, session(behavior))
+  assert.equal(exploreSample.teacher_strategy, 'explore')
+  assert.equal(exploreSample.teacher_target_slot, null)
+  assert.equal(exploreSample.teacher_reason, 'profile_break_loop_explore')
 })
 
 test('v8.1 exporter writes 214 features and immutable strategy labels', () => {

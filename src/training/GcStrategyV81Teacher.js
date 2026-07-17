@@ -53,7 +53,18 @@ class GcStrategyV81Teacher {
     const noProgress = features[189]
     const loopPressure = Math.max(features[191], features[192])
     if (mask[3] && (loopPressure >= 0.5 || noProgress >= 0.5)) {
-      return teacherSample(3, null, 'profile_break_loop', this.objective, frame, result)
+      const previousStrategy = frame.history_before?.previous_strategy || previousStrategyFromFeatures(features)
+      // A strategy label cannot choose the next cell; GC owns that resolver. Repeating
+      // explore in an observed 2/3-cycle therefore teaches the model to preserve the
+      // loop. Rotate to a different feasible resolver before returning to explore.
+      if (previousStrategy === 'explore' && mask[1]) {
+        return teacherSample(1, null, 'profile_break_loop_flee', this.objective, frame, result)
+      }
+      if ((previousStrategy === 'explore' || previousStrategy === 'flee') && scored[0]) {
+        return teacherSample(scored[0].labelIndex, scored[0].targetSlot,
+          'profile_break_loop_attack', this.objective, frame, result)
+      }
+      return teacherSample(3, null, 'profile_break_loop_explore', this.objective, frame, result)
     }
     const options = [{ labelIndex: 0, utility: 0, reason: 'hold' }]
     if (mask[1]) {
@@ -84,6 +95,12 @@ class GcStrategyV81Teacher {
 
     return teacherSample(selected.labelIndex, selected.targetSlot, selected.reason, this.objective, frame, result)
   }
+}
+
+function previousStrategyFromFeatures(features) {
+  const oneHot = features.slice(177, 188)
+  const index = oneHot.findIndex(entry => entry >= 0.5)
+  return index >= 0 ? STRATEGY_LABELS[index] : ''
 }
 
 function teacherSample(labelIndex, targetSlot, reason, objective, frame, result) {
