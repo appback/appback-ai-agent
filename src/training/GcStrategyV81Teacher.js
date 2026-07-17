@@ -34,8 +34,13 @@ class GcStrategyV81Teacher {
       const killProbability = Math.min(1, expectedDamage / Math.max(0.05, hpRatio))
       const threat = damageRatio * (0.5 + readiness * 0.5)
       const retaliation = canHitSelf * threat
+      // Navigator still takes an immediate safe finish instead of exploring forever.
+      const immediateFinish = this.profile.profile_id === 'navigator'
+        ? selfCanHit * (killProbability * 1.25 + finish * 0.5)
+        : 0
       const utility = value(this.objective.kills, 0.8) * (killProbability + finish) +
         value(this.objective.damage, 0.8) * (expectedDamage + selfCanHit * 0.25) +
+        immediateFinish +
         value(this.objective.win, 1) * threat * 0.15 -
         value(this.objective.survival, 0.8) * retaliation -
         value(this.objective.path_progress, 1) * pathRatio
@@ -65,7 +70,8 @@ class GcStrategyV81Teacher {
         labelIndex: 3,
         utility: value(this.objective.exploration, 0.4) * features[213] +
           value(this.objective.anti_stuck, 1.2) * (noProgress + loopPressure) -
-          value(this.objective.kills, 0.8) * features[210] * 0.2,
+          value(this.objective.kills, 0.8) * features[210] * 0.2 -
+          (value(this.objective.kills, 0.8) + value(this.objective.damage, 0.8)) * features[207] * 0.5,
         reason: loopPressure > 0 ? 'profile_break_loop' : 'profile_explore',
       })
     }

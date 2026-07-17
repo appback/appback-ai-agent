@@ -52,9 +52,10 @@ class ModelRegistry {
         throw new Error(`Model contract mismatch: ${key}=${meta[key] || 'missing'}, expected=${expected[key]}`)
       }
     }
-    if (meta.input_dim !== expected.feature_dim || meta.output_dim !== expected.output_dim) {
+    const inputDim = meta.feature_dim ?? meta.input_dim
+    if (inputDim !== expected.feature_dim || meta.output_dim !== expected.output_dim) {
       throw new Error(
-        `Model shape mismatch: ${meta.input_dim}x${meta.output_dim}, ` +
+        `Model shape mismatch: ${inputDim}x${meta.output_dim}, ` +
         `expected=${expected.feature_dim}x${expected.output_dim}`
       )
     }

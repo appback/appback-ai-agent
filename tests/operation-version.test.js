@@ -189,6 +189,26 @@ test('model registry rejects ONNX metadata from another operation or profile', a
   )
 })
 
+test('model registry accepts the GC upload feature_dim metadata field', () => {
+  const root = tempDir()
+  const modelPath = path.join(root, 'gc_strategy_model.onnx')
+  fs.writeFileSync(modelPath, 'contract-check-only')
+  const expected = runtime('gc-v8-strategy-r1', 'sha256:profile-a', '8.1')
+  expected.feature_dim = 214
+  expected.output_dim = 11
+  fs.writeFileSync(path.join(root, 'meta.json'), JSON.stringify({
+    operation_version: expected.operation_version,
+    feature_version: expected.feature_version,
+    feature_schema_hash: expected.feature_schema_hash,
+    training_version: expected.training_version,
+    behavior_profile_hash: expected.behavior_profile_hash,
+    feature_dim: 214,
+    output_dim: 11,
+  }))
+
+  assert.doesNotThrow(() => new ModelRegistry(root)._validateContract(modelPath, expected))
+})
+
 test('training runner freezes the startup profile contract for an in-progress generation', () => {
   const root = tempDir()
   const outputDir = path.join(root, 'models')

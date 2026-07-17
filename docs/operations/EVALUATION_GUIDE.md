@@ -99,3 +99,35 @@ no_progress_rate:   0.000
 저장된 기준 보고서: `reports/evaluation/maze-navigator.json`
 
 성격 차별성 기준 보고서: `reports/evaluation/personality-differentiation.json`
+
+## v8.1 Round 7 bootstrap 후보
+
+실제 v8.1 frame이 없는 최초 canary 수집용 모델은 deterministic synthetic raw state로만 생성한다.
+이 절차는 운영 데이터가 아니며 결과 metadata에 `observation_policy=synthetic_bootstrap`과 빈
+`source_behavior_profile_hashes`를 강제한다.
+
+```bash
+npm run gc:v81:bootstrap -- --sessions 256 --samples 8 --seed 8107
+
+for profile in balanced hunter survivor navigator; do
+  python3 training/train_gc_strategy_model.py \
+    --data-dir "training/data/v8.1-round7/$profile" \
+    --output-dir "artifacts/gc-v81-round7/$profile" \
+    --epochs 80 --batch-size 128 --seed 8107
+done
+
+python3 training/evaluate_gc_strategy_v81_candidates.py \
+  --data-root training/data/v8.1-round7 \
+  --models-root artifacts/gc-v81-round7
+
+python3 training/validate_gc_strategy_v81_artifacts.py \
+  --root artifacts/gc-v81-round7
+```
+
+각 profile 디렉토리는 `gc_strategy_model.onnx`, `meta.json`, `evaluation.json` 세 파일을 가진다.
+root의 `profile-differentiation.json`은 같은 2,048개 관측에 대한 네 모델의 전략 분포와
+pairwise disagreement를 기록한다. validator는 GC upload metadata의 필드 집합, checksum,
+evaluation digest, ONNX 214/11 shape 및 모든 offline gate를 fail-closed로 검사한다.
+
+이 후보는 격리 테스트 서버 canary만 허용한다. 운영 active, known-good, rollback 또는 strict
+전환에 사용하지 않으며, profile별 실게임 frame 수집 후 `same_profile_only` 후보로 교체한다.

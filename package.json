@@ -15,6 +15,7 @@
     "docs/operations/EVALUATION_GUIDE.md",
     "docs/design/GC_TRAINING_DATA_INTEGRATION.md",
     "training/*.py",
+    "training/*.js",
     "training/*.txt",
     "training/models/*.py",
     ".env.example"
@@ -22,7 +23,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "gc:v81:bootstrap": "node training/generate_gc_strategy_v81_bootstrap.js"
   },
   "keywords": [
     "ai",
