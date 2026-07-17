@@ -19,7 +19,11 @@ LABELS = [
 
 
 def load_features(data_root):
-    ticks = pd.read_csv(os.path.join(data_root, "balanced", "claw-clash_ticks.csv"))
+    profile_root = os.path.join(data_root, "balanced")
+    ticks_path = os.path.join(profile_root, "claw-clash_ticks.csv")
+    if not os.path.isfile(ticks_path):
+        ticks_path = os.path.join(profile_root, "dataset", "claw-clash_ticks.csv")
+    ticks = pd.read_csv(ticks_path)
     columns = [f"f{index}" for index in range(214)]
     features = ticks[columns].to_numpy(dtype=np.float32)
     if features.shape[1] != 214 or not np.isfinite(features).all():

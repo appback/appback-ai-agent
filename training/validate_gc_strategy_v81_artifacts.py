@@ -50,12 +50,20 @@ def validate_profile(root, profile):
         "training_version": "teacher-strategy-v8-r1",
         "behavior_profile_id": profile,
         "operation_version": "gc-v8-strategy-r1",
-        "observation_policy": "synthetic_bootstrap",
-        "source_behavior_profile_hashes": [],
     }
     for key, value in expected.items():
         if metadata.get(key) != value:
             raise ValueError(f"{profile}: {key}={metadata.get(key)!r}, expected={value!r}")
+    policy = metadata.get("observation_policy")
+    source_hashes = metadata.get("source_behavior_profile_hashes")
+    if policy == "synthetic_bootstrap":
+        if source_hashes != []:
+            raise ValueError(f"{profile}: synthetic_bootstrap requires no source behavior hashes")
+    elif policy == "same_profile_only":
+        if source_hashes != [metadata["behavior_profile_hash"]]:
+            raise ValueError(f"{profile}: same_profile_only requires exactly its own behavior hash")
+    else:
+        raise ValueError(f"{profile}: unsupported observation_policy={policy!r}")
     if metadata["model_checksum"] != file_sha256(model_path):
         raise ValueError(f"{profile}: model checksum mismatch")
     if metadata["evaluation_report_digest"] != file_sha256(evaluation_path):

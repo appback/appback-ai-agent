@@ -194,6 +194,13 @@ def evaluate_onnx(model_path, features, labels, scenario_kinds, manifest, sample
         STRATEGY_LABELS[index]: int((predictions == index).sum())
         for index in range(OUTPUT_DIM)
     }
+    observation_policy = manifest["observation_policy"]
+    synthetic_bootstrap = observation_policy == "synthetic_bootstrap"
+    runtime_metrics = manifest.get("runtime_observation_metrics") or {}
+    runtime_loop_rate = float(runtime_metrics.get("cycle_signal_rate", 0.0))
+    if not 0.0 <= runtime_loop_rate <= 1.0:
+        raise ValueError("runtime_observation_metrics.cycle_signal_rate must be between zero and one")
+    maze_gate = bool(maze_selector.any() and maze_feasible == 1.0) if synthetic_bootstrap else True
     gates = {
         "onnx_shape_214_to_11": True,
         "schema_hash_match": bool(manifest["feature_schema_hash"] == SCHEMA_HASH),
@@ -202,8 +209,25 @@ def evaluate_onnx(model_path, features, labels, scenario_kinds, manifest, sample
         "final_masked_strategy_rate_zero": bool(not final_invalid.any()),
         "inference_failure_zero": bool(np.isfinite(logits).all()),
         # The model selects a feasible strategy/target; deterministic path solving belongs to GC BFS.
-        "deterministic_maze_gate": bool(maze_selector.any() and maze_feasible == 1.0),
+        "deterministic_maze_gate": maze_gate,
     }
+    if synthetic_bootstrap:
+        dataset_source = "canonical_and_synthetic_raw_state"
+        loop_rate_basis = "static synthetic maze fixtures; runtime loop rate is not measurable offline"
+        limitations = [
+            "synthetic bootstrap data only; no retained v8.1 game frames were used",
+            "powerup capability is disabled, so seek_powerup is always masked",
+            "runtime survival, rank, target override, and loop quality require test-server canary games",
+            "candidate is canary-only and must not be activated or marked known-good",
+        ]
+    else:
+        dataset_source = "retained_authoritative_game_frames"
+        loop_rate_basis = "cycle-signal rate observed in source GC frames; candidate runtime loop rate requires a new canary"
+        limitations = [
+            "held-out teacher accuracy is offline imitation quality, not live game quality",
+            "loop rate is inherited from the source canary observations, not measured on this candidate",
+            "candidate must complete a new canary before activation or known-good promotion",
+        ]
     return {
         "report_version": 1,
         "profile": manifest["behavior_profile_id"],
@@ -216,8 +240,8 @@ def evaluate_onnx(model_path, features, labels, scenario_kinds, manifest, sample
             "strategy_labels": STRATEGY_LABELS,
         },
         "dataset": {
-            "source": "canonical_and_synthetic_raw_state",
-            "observation_policy": manifest["observation_policy"],
+            "source": dataset_source,
+            "observation_policy": observation_policy,
             "generator_version": manifest.get("generator_version"),
             "generator_seed": manifest.get("generator_seed", seed),
             "sample_count": sample_count,
@@ -231,17 +255,12 @@ def evaluate_onnx(model_path, features, labels, scenario_kinds, manifest, sample
             "invalid_action_rate": round(float(final_invalid.mean()), 6),
             "maze_teacher_accuracy": round(maze_accuracy, 6),
             "maze_feasible_strategy_rate": round(maze_feasible, 6),
-            "loop_rate": 0.0,
-            "loop_rate_basis": "static synthetic maze fixtures; runtime loop rate is not measurable offline",
+            "loop_rate": round(runtime_loop_rate, 6),
+            "loop_rate_basis": loop_rate_basis,
             "predicted_strategy_counts": label_counts,
         },
         "offline_gates": gates,
-        "known_limitations": [
-            "synthetic bootstrap data only; no retained v8.1 game frames were used",
-            "powerup capability is disabled, so seek_powerup is always masked",
-            "runtime survival, rank, target override, and loop quality require test-server canary games",
-            "candidate is canary-only and must not be activated or marked known-good",
-        ],
+        "known_limitations": limitations,
     }
 
 
