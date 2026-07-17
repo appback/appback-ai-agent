@@ -58,6 +58,8 @@ def validate_manifest(manifest, sessions):
             raise ValueError(f"{field}={manifest.get(field)!r}, expected={value!r}")
     if manifest.get("strategy_labels") != STRATEGY_LABELS:
         raise ValueError("strategy label order does not match the canonical v8.1 contract")
+    if not isinstance(manifest.get("behavior_profile_revision"), int) or manifest["behavior_profile_revision"] <= 0:
+        raise ValueError("behavior_profile_revision must be a positive integer")
     if manifest.get("observation_policy") == "synthetic_bootstrap":
         if manifest.get("source_behavior_profile_hashes") != []:
             raise ValueError("synthetic_bootstrap requires an empty source_behavior_profile_hashes array")
