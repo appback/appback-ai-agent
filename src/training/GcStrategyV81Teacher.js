@@ -52,6 +52,9 @@ class GcStrategyV81Teacher {
     const threatRatio = features[208]
     const noProgress = features[189]
     const loopPressure = Math.max(features[191], features[192])
+    if (mask[3] && (loopPressure >= 0.5 || noProgress >= 0.5)) {
+      return teacherSample(3, null, 'profile_break_loop', this.objective, frame, result)
+    }
     const options = [{ labelIndex: 0, utility: 0, reason: 'hold' }]
     if (mask[1]) {
       const belowThreshold = Math.max(0, value(this.policy.flee_hp_ratio, 0.28) - selfHp)
@@ -78,16 +81,19 @@ class GcStrategyV81Teacher {
     if (scored[0]) options.push({ ...scored[0], reason: 'profile_attack_target' })
     options.sort((left, right) => right.utility - left.utility || left.labelIndex - right.labelIndex)
     const selected = options.find(option => mask[option.labelIndex]) || { labelIndex: 0, reason: 'mask_fallback' }
-    const teacherStrategy = STRATEGY_LABELS[selected.labelIndex]
 
-    return {
-      teacher_strategy: teacherStrategy,
-      teacher_target_slot: selected.targetSlot ?? null,
-      teacher_reason: selected.reason,
-      observed_strategy: frame.inference?.model_strategy || frame.execution?.executed_strategy || 'hold',
-      executed_strategy: frame.execution?.executed_strategy || 'hold',
-      sample_weight: sampleWeight(this.objective, frame, result),
-    }
+    return teacherSample(selected.labelIndex, selected.targetSlot, selected.reason, this.objective, frame, result)
+  }
+}
+
+function teacherSample(labelIndex, targetSlot, reason, objective, frame, result) {
+  return {
+    teacher_strategy: STRATEGY_LABELS[labelIndex],
+    teacher_target_slot: targetSlot ?? null,
+    teacher_reason: reason,
+    observed_strategy: frame.inference?.model_strategy || frame.execution?.executed_strategy || 'hold',
+    executed_strategy: frame.execution?.executed_strategy || 'hold',
+    sample_weight: sampleWeight(objective, frame, result),
   }
 }
 

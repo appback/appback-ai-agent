@@ -143,6 +143,17 @@ test('personality changes strategy and primary target on the same canonical stat
   assert.notEqual(decisions.hunter.teacher_strategy, decisions.survivor.teacher_strategy)
 })
 
+test('strategy teacher breaks an observed movement loop before scoring another attack', () => {
+  const behavior = profile('hunter')
+  const loopFrame = frame(behavior)
+  loopFrame.input.feature_vector[191] = 0.5
+  const sample = new GcStrategyV81Teacher(behavior).buildSample(loopFrame, session(behavior))
+  assert.equal(loopFrame.input.strategy_mask[3], 1)
+  assert.equal(sample.teacher_strategy, 'explore')
+  assert.equal(sample.teacher_target_slot, null)
+  assert.equal(sample.teacher_reason, 'profile_break_loop')
+})
+
 test('v8.1 exporter writes 214 features and immutable strategy labels', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gc-v81-export-'))
   const dataDir = path.join(root, 'data')
