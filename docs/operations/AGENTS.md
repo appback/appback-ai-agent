@@ -118,6 +118,7 @@ pm2 logs ai-agent --lines 20 --nostream
 
 | 일자 | 결과 | 비고 |
 |---|---|---|
+| 2026-07-17 | npm `2.3.0` 게시, #1·#2·#3·#5 패치 후 online/health 정상 | v7 operation `153/5` 유지, GC v8.1 capability 확인. #4는 방화벽으로 로컬 콘솔 작업 대기, #6은 PEM 재전달 대기 |
 | 2026-06-09 | EC2 신규 추가, `crab-5fdf70d6` online, doctor 통과 | appback-ai-agent v2.2.1, PyTorch 2.8.0+cpu |
 | 2026-05-11 | 5개 모두 online, GC API 응답 정상 | model_version=0 (weapon 수정 후 재학습 미진행), .21만 v1 |
 
