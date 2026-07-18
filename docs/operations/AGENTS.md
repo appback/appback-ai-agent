@@ -17,6 +17,23 @@
 
 전부 GC(claw-clash) 등록 + AI Rewards 연동 완료.
 
+### v8.1 운영 전환 상태
+
+2026-07-18 기준 접근 가능한 #1, #2, #3, #5는 `appback-ai-agent@2.3.2`와
+`gc-v8-strategy-r1`로 전환했다. GC는 agent별 `go` runtime과
+`same_profile_only` active revision을 사용한다.
+
+| Agent | Personality | Profile revision | Feature / output |
+|---|---|---:|---|
+| `crab-54347eb5` | `balanced` | 1 | `8.1 / 214 -> 11` |
+| `crab-11ede365` | `navigator` | 1 | `8.1 / 214 -> 11` |
+| `crab-d0cbca48` | `hunter` | 1 | `8.1 / 214 -> 11` |
+| `crab-95cf1514` | `survivor` | 1 | `8.1 / 214 -> 11` |
+
+전환 시 각 로컬 DB의 신원·토큰 1건은 유지하고 구 session/tick/training/loadout
+row와 구 이동 ONNX를 제거했다. #4(.21)와 #6(EC2)는 소유자 지시에 따라 이번 전환
+범위에서 제외했으며 현재 상태를 이 표의 네 인스턴스와 혼동하지 않는다.
+
 ---
 
 ## Host별 상세
@@ -118,6 +135,7 @@ pm2 logs ai-agent --lines 20 --nostream
 
 | 일자 | 결과 | 비고 |
 |---|---|---|
+| 2026-07-18 | npm `2.3.2` 게시, #1·#2·#3·#5를 성격별 v8.1로 전환 | 4개 모두 PM2 online/health 정상. GC live game에서 record v2·214/11·inference ok 확인, v8.x legacy viewer WebSocket 비활성화, 구 로컬 데이터와 대상 v7 ONNX 제거. #4·#6 제외 |
 | 2026-07-17 | npm `2.3.0` 게시, #1·#2·#3·#5 패치 후 online/health 정상 | v7 operation `153/5` 유지, GC v8.1 capability 확인. #4는 방화벽으로 로컬 콘솔 작업 대기, #6은 PEM 재전달 대기 |
 | 2026-06-09 | EC2 신규 추가, `crab-5fdf70d6` online, doctor 통과 | appback-ai-agent v2.2.1, PyTorch 2.8.0+cpu |
 | 2026-05-11 | 5개 모두 online, GC API 응답 정상 | model_version=0 (weapon 수정 후 재학습 미진행), .21만 v1 |

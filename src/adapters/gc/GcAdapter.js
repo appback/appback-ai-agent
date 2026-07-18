@@ -48,7 +48,7 @@ class GcAdapter extends BaseGameAdapter {
   }
 
   get gameName() { return 'claw-clash' }
-  get supportsRealtime() { return true }
+  get supportsRealtime() { return this.collectLegacyTraining }
 
   async initialize() {
     await this._checkServerContract()
@@ -115,7 +115,7 @@ class GcAdapter extends BaseGameAdapter {
     }
 
     // Only load a model produced for the active operation/profile generation.
-    if (this.modelRegistry && this.modelRelativePath) {
+    if (this.collectLegacyTraining && this.modelRegistry && this.modelRelativePath) {
       await this.modelRegistry.loadModel('gc', 'gc_move_model', {
         featureDim: this.runtimeContext.feature_dim,
         path: this.modelRelativePath,
@@ -123,15 +123,16 @@ class GcAdapter extends BaseGameAdapter {
       }).catch(err => log.warn(`Active generation model rejected: ${err.message}`))
     }
 
-    // Connect WebSocket
-    this.ws.connect()
-    this.ws.onTick((data) => this._onTick(data))
-    this.ws.onGameState((data) => this._onGameState(data))
-    this.ws.onBattleEnded((data) => this._onBattleEnded(data))
-    this.ws.onGameCancelled((data) => this._onGameCancelled(data))
-
-    // Handle reconnection: re-join room or recover from stale game
-    this.ws.onReconnect(() => this._onReconnect())
+    if (this.supportsRealtime) {
+      this.ws.connect()
+      this.ws.onTick((data) => this._onTick(data))
+      this.ws.onGameState((data) => this._onGameState(data))
+      this.ws.onBattleEnded((data) => this._onBattleEnded(data))
+      this.ws.onGameCancelled((data) => this._onGameCancelled(data))
+      this.ws.onReconnect(() => this._onReconnect())
+    } else {
+      log.info('GC server-owned inference active; legacy viewer WebSocket disabled')
+    }
   }
 
   async _checkServerContract() {
@@ -339,7 +340,7 @@ class GcAdapter extends BaseGameAdapter {
       }
     }
 
-    this.ws.joinGame(this.activeGameId)
+    if (this.supportsRealtime) this.ws.joinGame(this.activeGameId)
 
     // Start data collection session
     if (this.dataCollector && this.collectLegacyTraining) {
@@ -348,7 +349,7 @@ class GcAdapter extends BaseGameAdapter {
       )
     }
 
-    if (!this._terrainCached) this._cacheTerrain()
+    if (this.supportsRealtime && !this._terrainCached) this._cacheTerrain()
 
     log.info(`Entered game ${this.activeGameId}, slot=${this.mySlot}`)
   }

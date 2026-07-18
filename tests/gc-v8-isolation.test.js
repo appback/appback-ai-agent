@@ -46,6 +46,12 @@ test('v8 operation never starts the legacy viewer training session', async () =>
   assert.equal(v81.instance.sessionId, null)
 })
 
+test('server-owned v8 inference disables the legacy realtime path', () => {
+  assert.equal(adapter('7.0').instance.supportsRealtime, true)
+  assert.equal(adapter('8.0').instance.supportsRealtime, false)
+  assert.equal(adapter('8.1').instance.supportsRealtime, false)
+})
+
 test('loadout profile context is gated by the server capability', async () => {
   const { instance } = adapter('8.0')
   instance.api.getAgentContract = async () => ({
