@@ -34,6 +34,14 @@
 row와 구 이동 ONNX를 제거했다. #4(.21)와 #6(EC2)는 소유자 지시에 따라 이번 전환
 범위에서 제외했으며 현재 상태를 이 표의 네 인스턴스와 혼동하지 않는다.
 
+2026-07-18 재점검에서 #1, #2, #3, #5의 활성 경로에 남아 있던
+`gc-v7-path-aware-r1` operation history, `153 -> 5` `gc_move_net` metadata,
+generation ONNX와 #3의 `gc_move_model_single.onnx`를 추가 제거했다. 삭제 전 파일과
+과거 PM2 로그는 각 호스트의 `~/backups/ai-agent-v7-cleanup-*` 및
+`~/backups/ai-agent-v7-log-cleanup-*`에 체크섬과 함께 격리했다. 현재
+`operation.json`, v8.1 training feed DB, GC 서버의 v8.1 active revision은 제거 대상이
+아니다.
+
 ---
 
 ## Host별 상세
@@ -135,7 +143,7 @@ pm2 logs ai-agent --lines 20 --nostream
 
 | 일자 | 결과 | 비고 |
 |---|---|---|
-| 2026-07-18 | npm `2.3.2` 게시, #1·#2·#3·#5를 성격별 v8.1로 전환 | 4개 모두 PM2 online/health 정상. GC live game에서 record v2·214/11·inference ok 확인, v8.x legacy viewer WebSocket 비활성화, 구 로컬 데이터와 대상 v7 ONNX 제거. `.30` 누적 PM2 restart `10/15`를 reset한 뒤 3분간 7회 측정에서 PID 고정·restart/unstable/exit 0·ERROR/FATAL 0 확인. 로그 백업 `~/backups/ai-agent-pm2-log-reset-20260718T042106Z`. #4·#6 제외 |
+| 2026-07-18 | npm `2.3.2` 게시, #1·#2·#3·#5를 성격별 v8.1로 전환 | GC live game에서 record v2·214/11·inference ok 확인. 활성 경로의 v7 history·metadata·generation ONNX와 과거 오류 로그를 체크섬 백업 후 제거했다. 네 인스턴스를 30초 간격 7회 재측정해 PID 고정·PM2 restart/unstable/exit 0·health ok·신규 ERROR/FATAL 0을 확인했다. 안정성 로그 SHA-256 `4887a2e762227dfab93a82f9ec3026fe9b92b387088759946fa0059f6c9e2b9c`. #4·#6 제외 |
 | 2026-07-17 | npm `2.3.0` 게시, #1·#2·#3·#5 패치 후 online/health 정상 | v7 operation `153/5` 유지, GC v8.1 capability 확인. #4는 방화벽으로 로컬 콘솔 작업 대기, #6은 PEM 재전달 대기 |
 | 2026-06-09 | EC2 신규 추가, `crab-5fdf70d6` online, doctor 통과 | appback-ai-agent v2.2.1, PyTorch 2.8.0+cpu |
 | 2026-05-11 | 5개 모두 online, GC API 응답 정상 | model_version=0 (weapon 수정 후 재학습 미진행), .21만 v1 |
