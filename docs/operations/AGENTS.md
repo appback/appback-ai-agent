@@ -143,6 +143,7 @@ pm2 logs ai-agent --lines 20 --nostream
 
 | 일자 | 결과 | 비고 |
 |---|---|---|
+| 2026-07-18 | npm `2.3.3` 게시, #1·#2·#3·#5에 v8.1 자동학습 배포 | 성격별 완료 50게임마다 `same_profile_only` export→214/11 학습→offline gate→immutable 후보 업로드를 수행하고 자동 active는 하지 않는다. 네 호스트 doctor 통과, 실제 navigator 10게임·376 frame 학습 accuracy 0.855263·invalid 0·gate 7/7, 전체 테스트 68/68 통과. 배포 후 30초 간격 7회 PID 고정·restart/unstable/exit 0·health ok. 안정성 로그 SHA-256 `144807bb3c50a1c8a7b5bfc8421f818f8de1795c27d2b8f31d9bee98ca73ea88`. #4·#6 제외 |
 | 2026-07-18 | npm `2.3.2` 게시, #1·#2·#3·#5를 성격별 v8.1로 전환 | GC live game에서 record v2·214/11·inference ok 확인. 활성 경로의 v7 history·metadata·generation ONNX와 과거 오류 로그를 체크섬 백업 후 제거했다. 네 인스턴스를 30초 간격 7회 재측정해 PID 고정·PM2 restart/unstable/exit 0·health ok·신규 ERROR/FATAL 0을 확인했다. 안정성 로그 SHA-256 `4887a2e762227dfab93a82f9ec3026fe9b92b387088759946fa0059f6c9e2b9c`. #4·#6 제외 |
 | 2026-07-17 | npm `2.3.0` 게시, #1·#2·#3·#5 패치 후 online/health 정상 | v7 operation `153/5` 유지, GC v8.1 capability 확인. #4는 방화벽으로 로컬 콘솔 작업 대기, #6은 PEM 재전달 대기 |
 | 2026-06-09 | EC2 신규 추가, `crab-5fdf70d6` online, doctor 통과 | appback-ai-agent v2.2.1, PyTorch 2.8.0+cpu |
