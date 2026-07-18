@@ -81,7 +81,12 @@ npx appback-ai-agent export
 npx appback-ai-agent train
 ```
 
-v8 자동학습과 자동 업로드는 품질 평가 보고서가 연결될 때까지 비활성이다. 수동 학습으로 생성된 모델도 평가·업로드 단계가 완료되기 전에는 서버 active 모델을 변경하지 않는다.
+v8.1은 현재 성격으로 완료된 authoritative session이 `AUTO_TRAIN_AFTER_GAMES`에
+도달할 때마다 `same_profile_only` dataset을 export하고 214→11 모델을 학습한다.
+offline gate를 모두 통과한 모델만 immutable revision으로 자동 업로드하며, 서버의
+canary·active·known-good 전환은 관리자 승인으로 유지한다. 실패한 동일 세대의 재시도
+간격은 `AUTO_TRAIN_RETRY_MINUTES`이고, 필요하면
+`GC_V81_AUTO_TRAIN_ENABLED=false`로 학습만 중지할 수 있다.
 
 ## 성격 변경 시 동작
 

@@ -85,8 +85,9 @@ class TrainingRunner {
     const metaPath = path.join(this.outputDir, 'meta.json')
     if (!fs.existsSync(metaPath)) throw new Error(`Metadata not found: ${metaPath}`)
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'))
-    if (meta.input_dim !== this.runtimeContext.feature_dim) {
-      throw new Error(`input_dim=${meta.input_dim}, expected=${this.runtimeContext.feature_dim}`)
+    const inputDim = meta.feature_dim ?? meta.input_dim
+    if (inputDim !== this.runtimeContext.feature_dim) {
+      throw new Error(`feature_dim=${inputDim}, expected=${this.runtimeContext.feature_dim}`)
     }
     if (meta.output_dim !== this.runtimeContext.output_dim) {
       throw new Error(`output_dim=${meta.output_dim}, expected=${this.runtimeContext.output_dim}`)

@@ -515,6 +515,19 @@ class SqliteStore {
     }
   }
 
+  getCompletedTrainingSessionCount() {
+    const c = this.runtimeContext
+    return this.db.prepare(`
+      SELECT COUNT(DISTINCT tr.session_id) AS count
+      FROM gc_training_results tr
+      JOIN gc_training_sessions ts ON ts.session_id = tr.session_id
+      JOIN gc_training_frames gf ON gf.session_id = ts.session_id
+      WHERE ts.operation_version = ? AND gf.operation_version = ?
+        AND gf.behavior_profile_hash = ?
+        AND json_extract(tr.payload, '$.completed') = 1
+    `).get(c.operation_version, c.operation_version, c.behavior_profile_hash).count
+  }
+
   getTrainingFeedForExport(options = {}) {
     const operationVersion = this.runtimeContext.operation_version
     const profileHash = this.runtimeContext.behavior_profile_hash

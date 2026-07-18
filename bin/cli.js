@@ -121,7 +121,10 @@ if (CMD === 'doctor') {
     process.env._PKG_ROOT = PKG_ROOT
     process.env._AGENT_CWD = CWD
     const paths = require(path.join(PKG_ROOT, 'src', 'paths'))
-    const p = path.join(paths.modelGenerationDir(buildRuntimeContext(operation, behavior)), 'gc_move_model.onnx')
+    const modelName = operation.feature_version === '8.1'
+      ? 'gc_strategy_model.onnx'
+      : 'gc_move_model.onnx'
+    const p = path.join(paths.modelGenerationDir(buildRuntimeContext(operation, behavior)), modelName)
     if (!fs.existsSync(p)) throw new Error('not found (will use rule-based)')
     const size = (fs.statSync(p).size / 1024).toFixed(1)
     return `${size} KB`

@@ -40,7 +40,7 @@ const OPERATION_CONTRACTS = Object.freeze({
   v8: V8_OPERATION_CONTRACT,
   v81: V81_OPERATION_CONTRACT,
 })
-const CURRENT_OPERATION_CONTRACT = V7_OPERATION_CONTRACT
+const CURRENT_OPERATION_CONTRACT = V81_OPERATION_CONTRACT
 
 function schemaHash(schemaId) {
   return `sha256:${crypto.createHash('sha256').update(schemaId).digest('hex')}`

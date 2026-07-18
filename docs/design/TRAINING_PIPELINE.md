@@ -1,32 +1,38 @@
 # Training Pipeline
 
-자동 학습 + 모델 업로드 파이프라인 설계.
+자동 학습 + 모델 업로드 파이프라인 설계. 현재 운영 기준은 v8.1이며, 아래 v7
+설명은 데이터 마이그레이션과 회귀 검증을 위한 legacy 참고 자료다.
 
 ---
 
 ## Overview
 
 ```
-게임 진행 → 틱 데이터 수집 (SQLite)
+GC authoritative frame/result 수집 (SQLite)
          ↓
-   50게임 도달 (AUTO_TRAIN_AFTER_GAMES)
+   현재 성격 완료 50게임 도달 (AUTO_TRAIN_AFTER_GAMES)
          ↓
-   game_ended 이벤트 → exporter.exportForTraining()
+   training feed sync → exporter.exportForTraining()
          ↓
-   CSV/JSON 생성 (training/data/raw/)
+   same_profile_only CSV/JSON 생성
          ↓
-   Python 학습 (train_gc_model.py)
+   Python 학습 + offline gate (train_gc_strategy_model.py)
          ↓
-   ONNX 모델 export (models/gc/gc_move_model.onnx)
+   214→11 ONNX 모델 export (gc_strategy_model.onnx)
          ↓
-   서버 업로드 (POST /agents/me/model)
+   immutable 후보 업로드 (POST /agents/me/models/v8)
          ↓
-   서버에서 LRU 캐시 무효화 → 다음 게임부터 적용
+   관리자 canary·active 승인 후 다음 게임부터 적용
 ```
+
+v8.1은 50, 100, 150게임 세대마다 한 번만 실행한다. 학습 상태는 성격별 generation
+디렉터리의 `auto-training-state.json`에 원자적으로 기록해 재시작이나 30초 sync가
+중복 학습을 만들지 않도록 한다. 자동 업로드는 후보 생성까지이며 자동 active는 하지
+않는다.
 
 ---
 
-## Components
+## Legacy v7 Reference
 
 ### 1. Data Collection — `src/core/DataCollector.js`
 
@@ -103,10 +109,9 @@ const uploadResult = await gc.api.uploadModel(modelPath)
 ## Trigger Conditions
 
 ```javascript
-// src/index.js
-if (totalGames > 0 && totalGames % autoTrainAfter === 0 && !trainer.isRunning) {
-  // export → train → upload
-}
+// src/core/GcV81AutoTrainer.js
+thresholdCount = Math.floor(completedSessions / threshold) * threshold
+// 새 threshold 세대일 때만 export → train → gate → candidate upload
 ```
 
 - 정확히 50, 100, 150, ...에서만 트리거

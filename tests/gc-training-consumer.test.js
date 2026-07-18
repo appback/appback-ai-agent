@@ -112,6 +112,7 @@ test('consumer persists frames/results and advances cursors atomically', async (
   assert.equal(synced.results.inserted, 1)
   assert.equal(sessionRequests, 1)
   assert.deepEqual(store.getTrainingFeedCounts(), { sessions: 1, frames: 1, results: 1 })
+  assert.equal(store.getCompletedTrainingSessionCount(), 1)
   assert.equal(store.getTrainingCursor('frames'), 'tf1:1')
   assert.equal(store.getTrainingCursor('results'), 'tr1:1')
   store.close()

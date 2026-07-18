@@ -115,8 +115,11 @@ npx appback-ai-agent evaluate personality
 
 ```bash
 npx appback-ai-agent export    # 데이터 추출
-npx appback-ai-agent train     # 학습 실행 → 모델 생성 → 서버 업로드
+npx appback-ai-agent train     # 수동 학습 실행 → 로컬 모델·평가 보고서 생성
 ```
+
+v8.1 운영 프로세스는 성격별 완료 게임 50건마다 자동으로 학습·평가하고, gate를 통과한
+모델을 서버 후보 revision으로 업로드합니다. canary·active 전환은 관리자 승인 대상입니다.
 
 Ubuntu 24.04 (PEP 668) 환경:
 ```bash

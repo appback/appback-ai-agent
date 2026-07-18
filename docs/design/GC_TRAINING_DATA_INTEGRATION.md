@@ -162,9 +162,10 @@ AI Agent 준비 완료:
 - schema 불일치 시 cursor 미갱신
 - HTTP 410 cursor 만료를 domain error로 변환하고 checkpoint 보존
 - GC `0f2c33b4`의 frame에 누락된 `agent.slot`은 session `agent_slot`으로 보강한 뒤 검증·저장
-- 기본 v7 operation에서는 runtime 비활성
+- 신규 설치의 기본 operation은 v8.1이며 기존 v7/v8.0 설정은 명시적으로 유지되는 동안만 호환
 - `operation activate v8 --yes`인 agent에서만 cursor consumer scheduler 활성화
-- v8에서는 legacy viewer snapshot 수집과 v7 자동학습 차단
+- v8에서는 legacy viewer snapshot 수집을 차단하고 v8.1 authoritative feed 자동학습을 사용
+- 현재 성격의 완료 세션 50건마다 `same_profile_only` export, 214→11 학습, offline gate, 후보 업로드 수행
 - 관리자 profile 기반 BFS teacher, sample weight와 192차원 CSV/manifest export
 - Python trainer의 v7 보정 경로와 v8 teacher-label 경로 분리
 - GC capability 정규화와 `loadout_profile_id/hash/revision` 로컬 검증

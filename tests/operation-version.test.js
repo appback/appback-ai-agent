@@ -65,7 +65,7 @@ test('operation store detects an explicitly activated supported v8 contract on r
   assert.equal(restarted.ensureActive().feature_schema_hash, V8_OPERATION_CONTRACT.feature_schema_hash)
 })
 
-test('operation CLI explicitly activates v8 without changing the default v7 contract', () => {
+test('operation CLI can explicitly activate the retained v8.0 contract', () => {
   const dir = tempDir()
   const cli = path.join(__dirname, '..', 'bin', 'cli.js')
   const activated = spawnSync(process.execPath, [cli, 'operation', 'activate', 'v8', '--yes'], {
@@ -227,4 +227,27 @@ test('training runner freezes the startup profile contract for an in-progress ge
   const metadata = JSON.parse(fs.readFileSync(path.join(outputDir, 'meta.json'), 'utf8'))
   assert.equal(metadata.behavior_profile_hash, 'sha256:profile-before')
   assert.equal(metadata.behavior_profile_revision, 2)
+})
+
+test('training runner accepts v8.1 feature_dim metadata', () => {
+  const root = tempDir()
+  const outputDir = path.join(root, 'models')
+  fs.mkdirSync(outputDir)
+  fs.writeFileSync(path.join(outputDir, 'meta.json'), JSON.stringify({
+    feature_dim: 214,
+    output_dim: 11,
+  }))
+  const runtimeContext = {
+    ...V81_OPERATION_CONTRACT,
+    behavior_profile_id: 'navigator',
+    behavior_profile_hash: 'sha256:profile-v81',
+    behavior_profile_revision: 1,
+  }
+
+  const runner = new TrainingRunner({ outputDir, runtimeContext })
+  assert.doesNotThrow(() => runner._writeOperationMetadata())
+  const metadata = JSON.parse(fs.readFileSync(path.join(outputDir, 'meta.json'), 'utf8'))
+  assert.equal(metadata.feature_dim, 214)
+  assert.equal(metadata.feature_version, '8.1')
+  assert.equal(metadata.behavior_profile_hash, 'sha256:profile-v81')
 })

@@ -300,6 +300,7 @@ GC가 제공하는 frame의 profile hash는 실제 추론에 사용한 모델 re
 - 성격 설정은 v7 이동 모델의 ONNX 행동을 변경하지 않지만 장비 선택에는 적용된다.
 - 실행 중인 agent는 설정 파일을 hot reload하지 않으므로 성격 변경 후 재시작해야 한다.
 - CLI의 `Deployed` 표시는 아직 서버 active revision 조회와 연결되지 않았다.
-- v8 자동학습·자동 활성화는 품질 게이트 연결 전까지 비활성이다.
+- v8.1은 현재 성격의 완료 게임 50건마다 자동학습·offline gate·후보 업로드를 수행한다.
+- 후보의 canary·active·known-good 전환은 관리자 승인 전까지 자동화하지 않는다.
 
 따라서 현재 단계에서 `personality set`은 운영 중인 ONNX 모델을 교체하지 않는다. 다만 agent를 재시작하면 다음 challenge부터 새 profile hash의 장비 선호와 별도 성과 기록을 사용한다.

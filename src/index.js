@@ -20,6 +20,7 @@ const EventBus = require('./core/EventBus')
 const ModelRegistry = require('./core/ModelRegistry')
 const DataCollector = require('./core/DataCollector')
 const TrainingRunner = require('./core/TrainingRunner')
+const GcV81AutoTrainer = require('./core/GcV81AutoTrainer')
 const Scheduler = require('./core/Scheduler')
 const HealthMonitor = require('./core/HealthMonitor')
 const TrainingExporter = require('./data/exporters/TrainingExporter')
@@ -53,6 +54,8 @@ async function main() {
   const trainingSyncEnabled = runtimeContext.feature_version.startsWith('8.') &&
     parseBoolean(process.env.GC_TRAINING_SYNC_ENABLED, true)
   const trainingSyncInterval = parseInt(process.env.GC_TRAINING_SYNC_INTERVAL_SEC || '30')
+  const v81AutoTrainEnabled = runtimeContext.feature_version === '8.1' &&
+    parseBoolean(process.env.GC_V81_AUTO_TRAIN_ENABLED, true)
 
   log.info(`Behavior personality: ${behaviorProfile.effective.profile_id} (${behaviorProfile.effective.profile_hash}, r${behaviorProfile.effective.source_revision})`)
   log.info(`Operation contract: ${runtimeContext.operation_version} / feature v${runtimeContext.feature_version} (${runtimeContext.feature_dim} dims)`)
@@ -69,6 +72,7 @@ async function main() {
     autoTrainAfterGames: autoTrainAfter,
     runtimeContext,
   })
+  let v81AutoTrainer = null
 
   // Load historical metrics
   metrics.load('claw-clash')
@@ -92,6 +96,18 @@ async function main() {
     modelRelativePath,
     agentVersion: pkgVersion,
   })
+  if (v81AutoTrainEnabled) {
+    v81AutoTrainer = new GcV81AutoTrainer({
+      store,
+      exporter,
+      trainer,
+      api: gc.api,
+      runtimeContext,
+      outputDir: modelGenerationDir,
+      threshold: autoTrainAfter,
+      retryDelayMs: parseInt(process.env.AUTO_TRAIN_RETRY_MINUTES || '60') * 60 * 1000,
+    })
+  }
   manager.registerAdapter(gc)
 
   // Health monitor
@@ -116,8 +132,14 @@ async function main() {
   if (trainingSyncEnabled && gc.apiToken) {
     const consumer = new GcTrainingDataConsumer({ api: gc.api, store, runtimeContext })
     trainingSyncScheduler = new Scheduler(trainingSyncInterval)
-    trainingSyncScheduler.start(() => consumer.syncAvailable())
+    trainingSyncScheduler.start(async () => {
+      await consumer.syncAvailable()
+      if (v81AutoTrainer) void v81AutoTrainer.maybeTrain().catch(error => {
+        log.error('GC v8.1 auto-training check failed', error.message)
+      })
+    })
     log.info(`GC v8 training feed enabled, interval=${trainingSyncInterval}s`)
+    if (v81AutoTrainer) log.info(`GC v8.1 auto-training enabled, threshold=${autoTrainAfter} completed sessions`)
   } else if (trainingSyncEnabled) {
     log.warn('GC v8 training feed not started because agent authentication is unavailable')
   }

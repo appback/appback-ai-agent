@@ -102,7 +102,7 @@ generation ONNX와 #3의 `gc_move_model_single.onnx`를 추가 제거했다. 삭
 |---|---|
 | 서비스 | claw-clash (GC) |
 | API | `https://clash.appback.app/api/v1` |
-| 자동 학습 임계점 | 50게임 (`AUTO_TRAIN_AFTER_GAMES=50`) |
+| v8.1 자동 학습 | 성격별 완료 50게임마다 학습·평가·후보 업로드 (`AUTO_TRAIN_AFTER_GAMES=50`) |
 | 헬스 포트 | 9090 (충돌 시 +1 자동 증가) |
 | pm2 자동 재시작 | `pm2 save` 적용 (재부팅 시 자동 기동) |
 
