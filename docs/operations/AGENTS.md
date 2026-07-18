@@ -135,7 +135,7 @@ pm2 logs ai-agent --lines 20 --nostream
 
 | 일자 | 결과 | 비고 |
 |---|---|---|
-| 2026-07-18 | npm `2.3.2` 게시, #1·#2·#3·#5를 성격별 v8.1로 전환 | 4개 모두 PM2 online/health 정상. GC live game에서 record v2·214/11·inference ok 확인, v8.x legacy viewer WebSocket 비활성화, 구 로컬 데이터와 대상 v7 ONNX 제거. #4·#6 제외 |
+| 2026-07-18 | npm `2.3.2` 게시, #1·#2·#3·#5를 성격별 v8.1로 전환 | 4개 모두 PM2 online/health 정상. GC live game에서 record v2·214/11·inference ok 확인, v8.x legacy viewer WebSocket 비활성화, 구 로컬 데이터와 대상 v7 ONNX 제거. `.30` 누적 PM2 restart `10/15`를 reset한 뒤 3분간 7회 측정에서 PID 고정·restart/unstable/exit 0·ERROR/FATAL 0 확인. 로그 백업 `~/backups/ai-agent-pm2-log-reset-20260718T042106Z`. #4·#6 제외 |
 | 2026-07-17 | npm `2.3.0` 게시, #1·#2·#3·#5 패치 후 online/health 정상 | v7 operation `153/5` 유지, GC v8.1 capability 확인. #4는 방화벽으로 로컬 콘솔 작업 대기, #6은 PEM 재전달 대기 |
 | 2026-06-09 | EC2 신규 추가, `crab-5fdf70d6` online, doctor 통과 | appback-ai-agent v2.2.1, PyTorch 2.8.0+cpu |
 | 2026-05-11 | 5개 모두 online, GC API 응답 정상 | model_version=0 (weapon 수정 후 재학습 미진행), .21만 v1 |
