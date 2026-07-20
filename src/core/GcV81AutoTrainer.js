@@ -157,6 +157,7 @@ class GcV81AutoTrainer {
       behavior_profile_hash: this.runtimeContext.behavior_profile_hash,
       updated_at: new Date().toISOString(),
     }
+    if (state.status !== 'failed') delete state.error
     const temporary = `${this.statePath}.${process.pid}.tmp`
     fs.writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`)
     fs.renameSync(temporary, this.statePath)

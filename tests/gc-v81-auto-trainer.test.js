@@ -128,3 +128,22 @@ test('v8.1 auto-training rejects cross-profile artifacts before upload', async t
   assert.match(result.error, /source behavior profile/)
   assert.equal(subject.calls().uploadCalls, 0)
 })
+
+test('v8.1 auto-training clears a previous upload error after recovery', async t => {
+  const subject = fixture()
+  t.after(() => fs.rmSync(subject.outputDir, { recursive: true, force: true }))
+  fs.writeFileSync(path.join(subject.outputDir, 'auto-training-state.json'), JSON.stringify({
+    status: 'failed',
+    attempted_session_count: 50,
+    error: 'Request failed with status code 503',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  }))
+  subject.setCompletedSessions(100)
+
+  assert.equal((await subject.autoTrainer.maybeTrain()).status, 'uploaded')
+
+  const state = JSON.parse(fs.readFileSync(path.join(subject.outputDir, 'auto-training-state.json')))
+  assert.equal(state.status, 'uploaded')
+  assert.equal(Object.hasOwn(state, 'error'), false)
+  assert.equal(state.last_success_session_count, 100)
+})

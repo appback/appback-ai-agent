@@ -8,7 +8,7 @@ const GcTrainingDataConsumer = require('../src/data/GcTrainingDataConsumer')
 const GcApiClient = require('../src/adapters/gc/GcApiClient')
 
 const HASH = `sha256:${'a'.repeat(64)}`
-const PROFILE_HASH = `sha256:${'b'.repeat(64)}`
+const PROFILE_HASH = `sha256:${'c'.repeat(64)}`
 
 function runtime() {
   return {
@@ -42,7 +42,7 @@ function frame(overrides = {}) {
       feature_schema_hash: HASH,
       training_version: 'collection-v8-r1',
     },
-    behavior_profile: { id: 'balanced', revision: 1, hash: PROFILE_HASH },
+    behavior_profile: { id: 'navigator', revision: 1, hash: PROFILE_HASH },
     model: { revision_id: 'revision-1', checksum: HASH },
     input: { feature_vector: new Array(192).fill(0), action_mask: [1, 1, 0, 1, 1] },
     inference: { status: 'ok', latency_us: 840, raw_argmax_action: 'up', model_action: 'left' },
