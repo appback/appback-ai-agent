@@ -1,0 +1,123 @@
+{
+  "report_version": 1,
+  "profile": "survivor",
+  "feature_contract": {
+    "feature_version": "8.1",
+    "feature_dim": 214,
+    "schema_id": "gc-strategy-v8-214-r1",
+    "schema_hash": "sha256:330be3849f095e9ffca2c46bb4a13b2c9cbbc0c55aade67aa163e0307a1e1a82",
+    "output_dim": 11,
+    "strategy_labels": [
+      "hold",
+      "flee",
+      "seek_powerup",
+      "explore",
+      "attack_candidate_0",
+      "attack_candidate_1",
+      "attack_candidate_2",
+      "attack_candidate_3",
+      "attack_candidate_4",
+      "attack_candidate_5",
+      "attack_candidate_6"
+    ]
+  },
+  "dataset": {
+    "source": "canonical_and_synthetic_raw_state",
+    "observation_policy": "synthetic_bootstrap",
+    "generator_version": "gc-v81-bootstrap-r1",
+    "generator_seed": 8107,
+    "sample_count": 2048,
+    "validation_sample_count": 410,
+    "session_count": 256,
+    "manifest_hash": "sha256:80282b3f9dca9e52409a65a2218c37b321bf5d2762a4a7338200dc49a1b1867c"
+  },
+  "metrics": {
+    "teacher_accuracy": 0.863415,
+    "raw_argmax_invalid_rate": 0.0,
+    "invalid_action_rate": 0.0,
+    "maze_teacher_accuracy": 0.794118,
+    "maze_feasible_strategy_rate": 1.0,
+    "loop_rate": 0.0,
+    "loop_rate_basis": "static synthetic maze fixtures; runtime loop rate is not measurable offline",
+    "predicted_strategy_counts": {
+      "hold": 0,
+      "flee": 166,
+      "seek_powerup": 0,
+      "explore": 75,
+      "attack_candidate_0": 43,
+      "attack_candidate_1": 48,
+      "attack_candidate_2": 0,
+      "attack_candidate_3": 8,
+      "attack_candidate_4": 0,
+      "attack_candidate_5": 38,
+      "attack_candidate_6": 32
+    }
+  },
+  "offline_gates": {
+    "onnx_shape_214_to_11": true,
+    "schema_hash_match": true,
+    "strategy_label_order_match": true,
+    "teacher_masked_strategy_rate_zero": true,
+    "final_masked_strategy_rate_zero": true,
+    "inference_failure_zero": true,
+    "deterministic_maze_gate": true,
+    "profile_differentiation": true
+  },
+  "known_limitations": [
+    "synthetic bootstrap data only; no retained v8.1 game frames were used",
+    "powerup capability is disabled, so seek_powerup is always masked",
+    "runtime survival, rank, target override, and loop quality require test-server canary games",
+    "candidate is canary-only and must not be activated or marked known-good"
+  ],
+  "model_sha256": "sha256:7640c589b93e714a24e96e837737cb2c14b95c184729b57ef3a269ae9e348982",
+  "profile_differentiation": {
+    "shared_observation_count": 2048,
+    "profile_rates": {
+      "balanced": {
+        "hold_rate": 0.0,
+        "flee_rate": 0.0,
+        "seek_powerup_rate": 0.0,
+        "explore_rate": 0.166504,
+        "attack_rate": 0.833496
+      },
+      "hunter": {
+        "hold_rate": 0.0,
+        "flee_rate": 0.0,
+        "seek_powerup_rate": 0.0,
+        "explore_rate": 0.0,
+        "attack_rate": 1.0
+      },
+      "survivor": {
+        "hold_rate": 0.0,
+        "flee_rate": 0.40625,
+        "seek_powerup_rate": 0.0,
+        "explore_rate": 0.17627,
+        "attack_rate": 0.41748
+      },
+      "navigator": {
+        "hold_rate": 0.0,
+        "flee_rate": 0.0,
+        "seek_powerup_rate": 0.0,
+        "explore_rate": 0.702148,
+        "attack_rate": 0.297852
+      }
+    },
+    "pairwise_strategy_disagreement": {
+      "balanced_vs_hunter": 0.379395,
+      "balanced_vs_survivor": 0.577637,
+      "balanced_vs_navigator": 0.667969,
+      "hunter_vs_survivor": 0.802734,
+      "hunter_vs_navigator": 0.845215,
+      "survivor_vs_navigator": 0.669922
+    },
+    "gates": {
+      "all_profiles_mask_safe": true,
+      "hunter_more_aggressive_than_balanced": true,
+      "survivor_flees_more_than_balanced": true,
+      "survivor_flees_more_than_hunter": true,
+      "navigator_explores_more_than_balanced": true,
+      "navigator_explores_more_than_hunter": true,
+      "all_profile_pairs_differ": true
+    }
+  }
+}

@@ -21,13 +21,14 @@ const ModelRegistry = require('./core/ModelRegistry')
 const DataCollector = require('./core/DataCollector')
 const TrainingRunner = require('./core/TrainingRunner')
 const GcV81AutoTrainer = require('./core/GcV81AutoTrainer')
+const GcV81ModelBootstrapper = require('./core/GcV81ModelBootstrapper')
 const Scheduler = require('./core/Scheduler')
 const HealthMonitor = require('./core/HealthMonitor')
 const TrainingExporter = require('./data/exporters/TrainingExporter')
 const SqliteStore = require('./data/storage/SqliteStore')
 const GcTrainingDataConsumer = require('./data/GcTrainingDataConsumer')
 const Metrics = require('./utils/metrics')
-const { BehaviorProfileStore } = require('./config/BehaviorProfileStore')
+const { BehaviorProfileStore, defaultProfile } = require('./config/BehaviorProfileStore')
 const { OperationVersionStore } = require('./config/OperationVersionStore')
 const { buildRuntimeContext } = require('./config/operationContract')
 const GcAdapter = require('./adapters/gc/GcAdapter')
@@ -43,7 +44,9 @@ async function main() {
   const eventBus = new EventBus()
   const modelDir = paths.modelDir()
   const dataDir = paths.dataDir()
-  const behaviorProfile = new BehaviorProfileStore(paths.configDir()).getCurrent()
+  const behaviorStore = new BehaviorProfileStore(paths.configDir())
+  let behaviorProfile = behaviorStore.getCurrent()
+  if (!behaviorProfile.persisted) behaviorProfile = behaviorStore.save(defaultProfile())
   const operationContract = new OperationVersionStore(paths.configDir()).ensureActive()
   const runtimeContext = buildRuntimeContext(operationContract, behaviorProfile)
   const trainingDataDir = paths.trainingDataDir(runtimeContext)
@@ -96,6 +99,12 @@ async function main() {
     modelRelativePath,
     agentVersion: pkgVersion,
   })
+  const modelBootstrapper = new GcV81ModelBootstrapper({
+    api: gc.api,
+    runtimeContext,
+    assetsRoot: paths.gcV81BootstrapRoot(),
+  })
+  gc.modelBootstrapper = modelBootstrapper
   if (v81AutoTrainEnabled) {
     v81AutoTrainer = new GcV81AutoTrainer({
       store,
@@ -133,6 +142,7 @@ async function main() {
     const consumer = new GcTrainingDataConsumer({ api: gc.api, store, runtimeContext })
     trainingSyncScheduler = new Scheduler(trainingSyncInterval)
     trainingSyncScheduler.start(async () => {
+      await modelBootstrapper.ensure(gc.serverCapabilities)
       await consumer.syncAvailable()
       if (v81AutoTrainer) void v81AutoTrainer.maybeTrain().catch(error => {
         log.error('GC v8.1 auto-training check failed', error.message)

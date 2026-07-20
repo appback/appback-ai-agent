@@ -84,7 +84,8 @@ npx appback-ai-agent train
 v8.1은 현재 성격으로 완료된 authoritative session이 `AUTO_TRAIN_AFTER_GAMES`에
 도달할 때마다 `same_profile_only` dataset을 export하고 214→11 모델을 학습한다.
 offline gate를 모두 통과한 모델만 immutable revision으로 자동 업로드하며, 서버의
-canary·active·known-good 전환은 관리자 승인으로 유지한다. 실패한 동일 세대의 재시도
+`model_auto_rollout` capability가 있으면 GC가 canary와 runtime 품질 평가를 수행해 자동 active
+전환한다. 30게임 gate 실패 시 기존 active를 유지하고 후보만 거부한다. 실패한 동일 세대의 재시도
 간격은 `AUTO_TRAIN_RETRY_MINUTES`이고, 필요하면
 `GC_V81_AUTO_TRAIN_ENABLED=false`로 학습만 중지할 수 있다.
 
@@ -109,6 +110,10 @@ canary·active·known-good 전환은 관리자 승인으로 유지한다. 실패
 powerup capability가 false인 동안 `collector`와 `seek_powerup` label은 bootstrap 대상에서 제외한다.
 synthetic 모델은 GC의 `synthetic_bootstrap` transition 정책에 따라 canary만 가능하며 active와
 rollback은 금지된다. 실제 frame을 수집한 뒤 `same_profile_only` provenance로 재학습해야 한다.
+신규 설치는 기본 성격을 revision 1로 저장하고, GC가 `model_auto_rollout=true`를 광고할 때 현재 Easy
+프리셋의 checksummed bootstrap을 자동 업로드한다. 네 프리셋 외 custom 성격은 다른 모델로 위장하지
+않으며 별도 bootstrap 생성 또는 raw observation 재라벨링이 필요하다. bootstrap 업로드 실패는
+프로세스를 재시작시키지 않고 training sync 주기에서 재시도한다.
 
 ## v8 전환 원칙
 

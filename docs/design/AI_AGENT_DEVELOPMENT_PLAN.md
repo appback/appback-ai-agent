@@ -10,8 +10,9 @@
 
 - AA-1 완료: Easy/Expert 설정, variation/seed, 장비 선호, 검증, revision/history/rollback, CLI, doctor 확인, 운영 가이드
 - AA-2 완료: GC authoritative frame consumer, BFS 교사 라벨, 성격별 sample weight, 192차원 export와 Python 학습 입력 분리
-- AA-3 부분 완료: 200개 deterministic maze, BFS teacher 평가, canonical 전투 fixture 성격 차별성 평가, JSON report와 CLI 품질 게이트
-- 기존 v8.0 ONNX 생성·upload·canary는 중단 상태를 유지한다. 다음 단계는 다수 personality v8.1 모델의 canary 품질 검증이다.
+- AA-3 완료: 200개 deterministic maze, BFS teacher 평가, canonical 전투 fixture 성격 차별성 평가, JSON report와 CLI 품질 게이트
+- v8.1 정식 자동학습 경로 완료: 네 Easy 프리셋 bootstrap, 50게임 same-profile 학습·upload, GC 30게임 runtime gate와 자동 active 전환
+- 기존 v8.0 ONNX 생성·upload·canary는 운영 학습 경로에서 제외한다.
 - 현재 성격 변경은 기존 운영 모델을 즉시 변경하지 않는다.
 - 운영 버전 관리 완료: operation/feature/training/profile 계약별 DB·export·모델 경로 격리, CLI 전환 차단
 - GC-1 연동 완료: v7 동작을 유지한 protocol/agent-version bridge header, agent-contract preflight, strict 조기 차단

@@ -1,6 +1,6 @@
 # GC v8 학습 데이터 연동 계약
 
-> **재설계 상태:** 기존 `8.0 / 192차원 / 5방향`은 실험 계약으로 유지하고, 첫 운영 후보는 `8.1 / 214차원 / 11전략`이다. GC Round 4 canonical 구현과 AI Agent Round 5 parity가 완료됐으며 테스트 서버 E2E 전에는 업로드·canary·운영 전환하지 않는다. 세부 전략 계약은 `GC_AI_STRATEGY_V8_PLAN.md`를 따른다.
+> **정식 서비스 상태:** 기존 `8.0 / 192차원 / 5방향`은 실험 계약으로 격리하고, 운영 계약은 `8.1 / 214차원 / 11전략`이다. canonical parity와 격리 E2E를 완료했으며 신규 설치 bootstrap, 50게임 자동학습, GC server-owned rollout을 기준 경로로 사용한다. 세부 전략 계약은 `GC_AI_STRATEGY_V8_PLAN.md`를 따른다.
 
 GC Go 서버와 AI Agent가 합의한 v8 운영 학습 데이터의 책임, wire contract와 AI Agent 구현 경계를 정의한다.
 
@@ -128,7 +128,7 @@ v7의 기존 `game_sessions`, `battle_ticks`와 섞지 않는다. v8 teacher/exp
 ## 초기 운영 정책
 
 - 수집 대상: canary/enrolled agent만
-- 활성화: 관리자 수동 승인
+- 활성화: 서버 소유 자동 rollout, agent별 비활성화 가능
 - raw logits: 미보존
 - canary frame 보존: 30일 권장
 - 일반 v8 frame 보존: 14일 권장
@@ -149,6 +149,11 @@ upload(model + metadata)
 ```
 
 AI Agent는 upload만 수행한다. canary, activate, rollback은 관리자 또는 서버 quality gate가 수행한다. strict 이후 v7 모델로 rollback하지 않는다.
+
+정식 v8.1 경로에서는 신규 agent가 네 Easy 프리셋 중 하나의 synthetic bootstrap을 자동 업로드하고,
+GC가 canary pointer를 설정한다. 현재 성격 50게임마다 AI Agent가 `same_profile_only` 후보를 학습·업로드하면
+GC는 synthetic canary를 교체한다. 30게임 runtime gate를 통과한 후보만 active가 되며, 더 적은 session의
+오래된 upload는 이후 canary로 되돌아갈 수 없다.
 
 ## 현재 구현 상태
 

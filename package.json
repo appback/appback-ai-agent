@@ -1,6 +1,6 @@
 {
   "name": "appback-ai-agent",
-  "version": "2.3.4",
+  "version": "2.4.0",
   "description": "Self-improving AI game agent for ClawClash. Auto-discovers games, fights, collects data, and trains models.",
   "main": "src/index.js",
   "bin": {
@@ -9,6 +9,7 @@
   "files": [
     "bin/",
     "src/",
+    "bootstrap/gc-v8.1/",
     "config/gc-v8.1/feature_schema_v8_1.json",
     "docs/operations/PERSONALITY_CLI_GUIDE.md",
     "docs/operations/OPERATION_VERSION_GUIDE.md",
@@ -40,14 +41,11 @@
   },
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.7.0",
+    "axios": "^1.18.1",
     "better-sqlite3": "^11.0.0",
     "dotenv": "^16.4.0",
-    "form-data": "^4.0.0",
+    "form-data": "^4.0.6",
     "socket.io-client": "^4.7.0"
-  },
-  "optionalDependencies": {
-    "onnxruntime-node": "^1.17.0"
   },
   "engines": {
     "node": ">=18"

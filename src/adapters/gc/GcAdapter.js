@@ -34,6 +34,7 @@ class GcAdapter extends BaseGameAdapter {
     this.serverCapabilities = Object.freeze({})
     this.metrics = opts.metrics || null
     this.modelRelativePath = opts.modelRelativePath || null
+    this.modelBootstrapper = opts.modelBootstrapper || null
     this.activeGameId = null
     this.mySlot = null
     this.currentLoadout = null
@@ -100,6 +101,15 @@ class GcAdapter extends BaseGameAdapter {
       } catch (err) {
         const msg = err.response?.data?.message || err.message
         throw new Error(`Auto-registration failed: ${msg}`)
+      }
+    }
+
+    if (this.modelBootstrapper) {
+      try {
+        const bootstrap = await this.modelBootstrapper.ensure(this.serverCapabilities)
+        log.info(`GC v8.1 model bootstrap: ${bootstrap.status}`)
+      } catch (err) {
+        log.warn(`GC v8.1 model bootstrap deferred: ${err.message}`)
       }
     }
 

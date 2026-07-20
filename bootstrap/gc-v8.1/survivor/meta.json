@@ -1,0 +1,37 @@
+{
+  "feature_version": "8.1",
+  "feature_dim": 214,
+  "feature_schema_hash": "sha256:330be3849f095e9ffca2c46bb4a13b2c9cbbc0c55aade67aa163e0307a1e1a82",
+  "output_dim": 11,
+  "action_labels": [
+    "hold",
+    "flee",
+    "seek_powerup",
+    "explore",
+    "attack_candidate_0",
+    "attack_candidate_1",
+    "attack_candidate_2",
+    "attack_candidate_3",
+    "attack_candidate_4",
+    "attack_candidate_5",
+    "attack_candidate_6"
+  ],
+  "training_version": "teacher-strategy-v8-r1",
+  "behavior_profile_id": "survivor",
+  "behavior_profile_hash": "sha256:43b583f2d9de49559dff2aa92edd3ae80db8681c23441c236aac32971824f88a",
+  "behavior_profile_revision": 1,
+  "operation_version": "gc-v8-strategy-r1",
+  "dataset_manifest_hash": "sha256:80282b3f9dca9e52409a65a2218c37b321bf5d2762a4a7338200dc49a1b1867c",
+  "dataset_session_count": 256,
+  "dataset_session_from": "01058450-9e4d-4917-9116-25f1692d92fc",
+  "dataset_session_to": "fed982cc-4f26-42fc-9653-92d283793dfb",
+  "observation_policy": "synthetic_bootstrap",
+  "source_behavior_profile_hashes": [],
+  "model_checksum": "sha256:7640c589b93e714a24e96e837737cb2c14b95c184729b57ef3a269ae9e348982",
+  "evaluation_report_digest": "sha256:aa1bef516b3c320824749cf4295beed86fd2438cefe4328ea1c515896dc8eaad",
+  "evaluation_summary": {
+    "teacher_accuracy": 0.863415,
+    "invalid_action_rate": 0.0,
+    "loop_rate": 0.0
+  }
+}

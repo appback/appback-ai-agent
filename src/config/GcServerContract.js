@@ -1,6 +1,7 @@
 const GC_PROTOCOL_VERSION = '1'
 const LOADOUT_PROFILE_CAPABILITY = 'loadout_profile_context'
 const STRATEGY_V81_CAPABILITY = 'strategy_v8_1'
+const MODEL_AUTO_ROLLOUT_CAPABILITY = 'model_auto_rollout'
 const LOADOUT_PROFILE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/
 const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/
 
@@ -147,6 +148,7 @@ function comparePrerelease(left, right) {
 module.exports = {
   GC_PROTOCOL_VERSION,
   LOADOUT_PROFILE_CAPABILITY,
+  MODEL_AUTO_ROLLOUT_CAPABILITY,
   STRATEGY_V81_CAPABILITY,
   assertRequiredRuntimeCapabilities,
   buildAgentHeaders,

@@ -29,4 +29,5 @@ module.exports = {
   ),
   trainingScript: () => path.join(PKG_ROOT, 'training', 'train_gc_model.py'),
   trainingRoot: () => path.join(PKG_ROOT, 'training'),
+  gcV81BootstrapRoot: () => path.join(PKG_ROOT, 'bootstrap', 'gc-v8.1'),
 }
