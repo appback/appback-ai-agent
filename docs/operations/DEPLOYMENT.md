@@ -71,6 +71,32 @@ git pull
 pm2 restart appback-ai-agent-dev
 ```
 
+### Runtime-only Docker workers
+
+학습을 실행하지 않는 `hunter`, `survivor`, `navigator` worker 3개를 독립적으로 실행한다.
+데이터 수집은 유지하므로 추후 profile별 중앙 집계에 사용할 수 있다.
+
+```bash
+git clone https://github.com/appback/appback-ai-agent.git
+cd appback-ai-agent
+docker compose -f docker-compose.runtime.yml up --build -d
+docker compose -f docker-compose.runtime.yml ps
+```
+
+- `GC_V81_AUTO_TRAIN_ENABLED=false`: 로컬 자동학습·후보 업로드 중지
+- `GC_TRAINING_SYNC_ENABLED=true`: GC authoritative frame/result 수집 유지
+- 각 service는 config/data/models/training 전용 named volume 사용
+- identity와 token은 각 SQLite volume에 개별 저장되며 로그에 출력하거나 공유하지 않음
+- 기존 PM2 또는 다른 Compose project의 container/volume은 변경하지 않음
+
+검증:
+
+```bash
+docker compose -f docker-compose.runtime.yml ps
+docker compose -f docker-compose.runtime.yml logs --tail=100
+docker inspect appback-ai-agent-hunter --format '{{.State.Health.Status}} {{.RestartCount}}'
+```
+
 ---
 
 ## Rollback

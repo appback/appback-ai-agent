@@ -1,0 +1,86 @@
+name: appback-ai-agent-workers
+
+x-agent-common: &agent-common
+  build:
+    context: .
+    dockerfile: Dockerfile.runtime
+    args:
+      APPBACK_AI_AGENT_VERSION: ${APPBACK_AI_AGENT_VERSION:-2.4.0}
+  image: appback-ai-agent:${APPBACK_AI_AGENT_VERSION:-2.4.0}-runtime
+  restart: unless-stopped
+  environment: &agent-environment
+    GC_API_URL: ${GC_API_URL:-https://clash.appback.app/api/v1}
+    GC_WS_URL: ${GC_WS_URL:-https://clash.appback.app}
+    GAME_DISCOVERY_INTERVAL_SEC: ${GAME_DISCOVERY_INTERVAL_SEC:-30}
+    MAX_CONCURRENT_GAMES: ${MAX_CONCURRENT_GAMES:-1}
+    GC_TRAINING_SYNC_ENABLED: ${GC_TRAINING_SYNC_ENABLED:-true}
+    GC_TRAINING_SYNC_INTERVAL_SEC: ${GC_TRAINING_SYNC_INTERVAL_SEC:-30}
+    GC_V81_AUTO_TRAIN_ENABLED: "false"
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+  healthcheck:
+    test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://127.0.0.1:9090/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 30s
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  hunter:
+    <<: *agent-common
+    container_name: appback-ai-agent-hunter
+    environment:
+      <<: *agent-environment
+      APPBACK_AGENT_PROFILE: hunter
+    volumes:
+      - hunter_config:/app/config
+      - hunter_data:/app/data
+      - hunter_models:/app/models
+      - hunter_training:/app/training
+
+  survivor:
+    <<: *agent-common
+    container_name: appback-ai-agent-survivor
+    environment:
+      <<: *agent-environment
+      APPBACK_AGENT_PROFILE: survivor
+    volumes:
+      - survivor_config:/app/config
+      - survivor_data:/app/data
+      - survivor_models:/app/models
+      - survivor_training:/app/training
+
+  navigator:
+    <<: *agent-common
+    container_name: appback-ai-agent-navigator
+    environment:
+      <<: *agent-environment
+      APPBACK_AGENT_PROFILE: navigator
+    volumes:
+      - navigator_config:/app/config
+      - navigator_data:/app/data
+      - navigator_models:/app/models
+      - navigator_training:/app/training
+
+volumes:
+  hunter_config:
+  hunter_data:
+  hunter_models:
+  hunter_training:
+  survivor_config:
+  survivor_data:
+  survivor_models:
+  survivor_training:
+  navigator_config:
+  navigator_data:
+  navigator_models:
+  navigator_training:
+

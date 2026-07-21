@@ -63,6 +63,19 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
+학습을 실행하지 않는 다중 수집·플레이 인스턴스 3개는 runtime Compose를 사용합니다.
+각 인스턴스는 identity, cursor, SQLite, 설정과 모델 볼륨을 공유하지 않습니다.
+
+```bash
+docker compose -f docker-compose.runtime.yml up --build -d
+docker compose -f docker-compose.runtime.yml ps
+```
+
+기본 profile은 `hunter`, `survivor`, `navigator`입니다. 이 구성은
+`GC_V81_AUTO_TRAIN_ENABLED=false`로 로컬 자동학습과 모델 업로드를 중지하지만,
+`GC_TRAINING_SYNC_ENABLED=true`로 authoritative training feed 수집은 유지합니다.
+여러 컨테이너가 하나의 SQLite 볼륨을 동시에 마운트하면 안 됩니다.
+
 ## CLI 명령어
 
 ```bash
