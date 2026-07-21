@@ -73,8 +73,8 @@ docker compose -f docker-compose.runtime.yml ps
 
 기본 profile은 `hunter`, `survivor`, `navigator`이며, 최초 생성 시 각 profile에
 서로 다른 random seed와 `15%` Easy variation을 적용합니다. 이 구성은
-`GC_V81_AUTO_TRAIN_ENABLED=false`로 로컬 자동학습과 모델 업로드를 중지하지만,
-`GC_TRAINING_SYNC_ENABLED=true`로 authoritative training feed 수집은 유지합니다.
+`GC_V81_AUTO_TRAIN_ENABLED=false`로 로컬 자동학습과 모델 업로드를 중지하고,
+`GC_TRAINING_SYNC_ENABLED=false`로 authoritative training feed도 내려받지 않습니다.
 여러 컨테이너가 하나의 SQLite 볼륨을 동시에 마운트하면 안 됩니다.
 
 ## CLI 명령어
