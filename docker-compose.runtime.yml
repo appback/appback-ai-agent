@@ -16,6 +16,7 @@ x-agent-common: &agent-common
     GC_TRAINING_SYNC_ENABLED: ${GC_TRAINING_SYNC_ENABLED:-true}
     GC_TRAINING_SYNC_INTERVAL_SEC: ${GC_TRAINING_SYNC_INTERVAL_SEC:-30}
     GC_V81_AUTO_TRAIN_ENABLED: "false"
+    APPBACK_AGENT_VARIATION: ${APPBACK_AGENT_VARIATION:-15}
     LOG_LEVEL: ${LOG_LEVEL:-info}
   healthcheck:
     test:
@@ -83,4 +84,3 @@ volumes:
   navigator_data:
   navigator_models:
   navigator_training:
-

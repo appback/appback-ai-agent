@@ -85,6 +85,7 @@ docker compose -f docker-compose.runtime.yml ps
 
 - `GC_V81_AUTO_TRAIN_ENABLED=false`: 로컬 자동학습·후보 업로드 중지
 - `GC_TRAINING_SYNC_ENABLED=true`: GC authoritative frame/result 수집 유지
+- `APPBACK_AGENT_VARIATION=15`: 최초 생성 시 profile별 행동·장비 가중치를 random seed로 변형
 - 각 service는 config/data/models/training 전용 named volume 사용
 - identity와 token은 각 SQLite volume에 개별 저장되며 로그에 출력하거나 공유하지 않음
 - 기존 PM2 또는 다른 Compose project의 container/volume은 변경하지 않음
