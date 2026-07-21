@@ -4,7 +4,7 @@
 
 ---
 
-## Active Agents (6개)
+## Active Agents (9개)
 
 | # | Agent Name | Agent ID | 호스트 | IP / Host | 계정 | 설치 방식 | pm2 이름 |
 |---|---|---|---|---|---|---|---|
@@ -14,8 +14,12 @@
 | 4 | `crab-a80f0b1e` | b386357f-8340-4058-b891-d732d0f8c9d9 | 운영 .21 | 192.168.0.21 (DAONE-PC WSL Ubuntu) | au212 | 글로벌 (`~/`) | `ai-agent` |
 | 5 | `crab-95cf1514` | b13d0b0d-83f1-4f33-a52f-d4ed1d4433c6 | 운영 .26 | 192.168.0.26 (SQream 서버) | ospadmin | **로컬 설치** (`~/ai-agent/`) | `ai-agent` |
 | 6 | `crab-5fdf70d6` | 5101bb05-cefb-4659-8f33-7d2e19ee3176 | 운영 EC2 | 43.202.206.43 | ec2-user | 글로벌 (`~/`) | `ai-agent` |
+| 7 | `crab-fbcf1e21` | 24553dca-5e05-4b1b-b26b-7e198db3c124 | 운영 EC2 | 43.202.206.43 | Docker | runtime-only `2.4.0` | `appback-ai-agent-hunter` |
+| 8 | `crab-15ff868a` | dbc7cf65-1d73-4bf3-8580-e432687769f5 | 운영 EC2 | 43.202.206.43 | Docker | runtime-only `2.4.0` | `appback-ai-agent-survivor` |
+| 9 | `crab-ce9c5401` | 3297f076-fd50-48c9-a815-b32c368432cf | 운영 EC2 | 43.202.206.43 | Docker | runtime-only `2.4.0` | `appback-ai-agent-navigator` |
 
-전부 GC(claw-clash) 등록 + AI Rewards 연동 완료.
+9개 모두 GC(claw-clash)에 등록됐다. #1~#6의 AI Rewards 연동은 기존 상태를 유지하며,
+#7~#9는 별도 등록 코드를 적용하지 않은 신규 GC identity다.
 
 ### v8.1 운영 전환 상태
 
@@ -33,6 +37,12 @@
 전환 시 각 로컬 DB의 신원·토큰 1건은 유지하고 구 session/tick/training/loadout
 row와 구 이동 ONNX를 제거했다. #4(.21)와 #6(EC2)는 소유자 지시에 따라 이번 전환
 범위에서 제외했으며 현재 상태를 이 표의 네 인스턴스와 혼동하지 않는다.
+
+2026-07-21에 #7~#9를 runtime-only Docker worker로 추가했다. 세 worker는 각각
+`hunter`, `survivor`, `navigator` profile이며 `8.1 / 214 -> 11` synthetic bootstrap
+revision이 canary다. `GC_V81_AUTO_TRAIN_ENABLED=false`로 로컬 학습과 학습 후보 업로드는
+하지 않고, `GC_TRAINING_SYNC_ENABLED=true`로 authoritative feed만 각 전용 SQLite
+volume에 수집한다. synthetic canary는 운영 active/known-good 승격 대상이 아니다.
 
 2026-07-18 재점검에서 #1, #2, #3, #5의 활성 경로에 남아 있던
 `gc-v7-path-aware-r1` operation history, `153 -> 5` `gc_move_net` metadata,
@@ -91,6 +101,13 @@ generation ONNX와 #3의 `gc_move_model_single.onnx`를 추가 제거했다. 삭
 - PM2: `ai-agent`, systemd `pm2-ec2-user.service` enabled/active
 - 데이터 위치: `~/data/agent.db`, `~/models/gc/`
 - 자동학습 Python: `~/.venv/bin/python3` (`torch 2.8.0+cpu`)
+- runtime-only Docker worker:
+  - source commit: `21f5f3e75e2f00b351de4cd1c3c881c7c2cddab3`
+  - image: `appback-ai-agent:2.4.0-runtime`
+  - image ID: `sha256:50ead1e2ff31ebbd8ab2f20bd57ca322da42119b36c8a2602ea9659f7ce4b0ed`
+  - Compose project: `appback-ai-agent-workers`
+  - 각 worker는 config/data/models/training 전용 named volume 사용
+  - 기존 PM2 `ai-agent`와 데이터·프로세스·재시작 정책을 공유하지 않음
 
 ---
 
@@ -143,6 +160,7 @@ pm2 logs ai-agent --lines 20 --nostream
 
 | 일자 | 결과 | 비고 |
 |---|---|---|
+| 2026-07-21 | EC2에 runtime-only Docker worker 3개 추가 | `hunter/survivor/navigator` 모두 v2.4.0, GC 등록·challenge·queue·8.1 synthetic canary 성공. 자동학습 false, feed sync true, container healthy/restart 0, ERROR/FATAL 0. 기존 PM2 `ai-agent` online/restart 0 유지 |
 | 2026-07-18 | npm `2.3.3` 게시, #1·#2·#3·#5에 v8.1 자동학습 배포 | 성격별 완료 50게임마다 `same_profile_only` export→214/11 학습→offline gate→immutable 후보 업로드를 수행하고 자동 active는 하지 않는다. 네 호스트 doctor 통과, 실제 navigator 10게임·376 frame 학습 accuracy 0.855263·invalid 0·gate 7/7, 전체 테스트 68/68 통과. 배포 후 30초 간격 7회 PID 고정·restart/unstable/exit 0·health ok. 안정성 로그 SHA-256 `144807bb3c50a1c8a7b5bfc8421f818f8de1795c27d2b8f31d9bee98ca73ea88`. #4·#6 제외 |
 | 2026-07-18 | npm `2.3.2` 게시, #1·#2·#3·#5를 성격별 v8.1로 전환 | GC live game에서 record v2·214/11·inference ok 확인. 활성 경로의 v7 history·metadata·generation ONNX와 과거 오류 로그를 체크섬 백업 후 제거했다. 네 인스턴스를 30초 간격 7회 재측정해 PID 고정·PM2 restart/unstable/exit 0·health ok·신규 ERROR/FATAL 0을 확인했다. 안정성 로그 SHA-256 `4887a2e762227dfab93a82f9ec3026fe9b92b387088759946fa0059f6c9e2b9c`. #4·#6 제외 |
 | 2026-07-17 | npm `2.3.0` 게시, #1·#2·#3·#5 패치 후 online/health 정상 | v7 operation `153/5` 유지, GC v8.1 capability 확인. #4는 방화벽으로 로컬 콘솔 작업 대기, #6은 PEM 재전달 대기 |
