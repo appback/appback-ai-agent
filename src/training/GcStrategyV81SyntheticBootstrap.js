@@ -7,8 +7,8 @@ const { SCHEMA, SCHEMA_HASH, STRATEGY_LABELS } = require('../config/gcStrategyV8
 const { GcStrategyV81Teacher } = require('./GcStrategyV81Teacher')
 
 const PROFILE_NAMES = Object.freeze(['balanced', 'hunter', 'survivor', 'navigator'])
-const OPERATION_VERSION = 'gc-v8-strategy-r1'
-const TRAINING_VERSION = 'teacher-strategy-v8-r1'
+const OPERATION_VERSION = 'gc-v8-strategy-r2'
+const TRAINING_VERSION = 'teacher-strategy-v8-r2'
 const GENERATOR_VERSION = 'gc-v81-bootstrap-r1'
 
 function generateSyntheticBootstrap(options = {}) {

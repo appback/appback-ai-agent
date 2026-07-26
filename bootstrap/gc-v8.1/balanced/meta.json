@@ -16,11 +16,11 @@
     "attack_candidate_5",
     "attack_candidate_6"
   ],
-  "training_version": "teacher-strategy-v8-r1",
+  "training_version": "teacher-strategy-v8-r2",
   "behavior_profile_id": "balanced",
   "behavior_profile_hash": "sha256:7537bf9b7f61e60f201b6d0587358ad8040a6265c7838caaa824c14153e79edb",
   "behavior_profile_revision": 1,
-  "operation_version": "gc-v8-strategy-r1",
+  "operation_version": "gc-v8-strategy-r2",
   "dataset_manifest_hash": "sha256:6c9d27b2ac8d7f9204321eb8f96b0162fd43ee20552fe293494aaa6a0da18345",
   "dataset_session_count": 256,
   "dataset_session_from": "004291d6-9089-47d8-ad3e-7255e561ca78",

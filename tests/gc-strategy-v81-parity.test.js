@@ -67,6 +67,7 @@ function frame(behavior, suffix = '1') {
       executed_strategy: 'explore', selected_target_slot: -1, executed_target_slot: -1,
       path_action: 'down', executed_action: 'down',
       strategy_override_reason: null, movement_override_reason: null,
+      planned_move_steps: 1, executed_move_steps: 1, movement_path: [[3, 4]],
     },
     history_before: FEATURE_FIXTURE.history,
     state: { agents: FEATURE_FIXTURE.agents, powerups: [] },
@@ -128,6 +129,22 @@ test('record_version 2 validator enforces strategy mask parity with feature indi
   const invalid = structuredClone(valid)
   invalid.input.strategy_mask[0] = 0
   assert.throws(() => assertTrainingFrame(invalid), /differs from feature_vector/)
+})
+
+test('r2 validator requires the authoritative executed movement path', () => {
+  const behavior = profile('survivor')
+  const valid = frame(behavior)
+  valid.execution.executed_strategy = 'flee'
+  valid.execution.attack_suppressed_reason = 'flee'
+  assert.equal(assertTrainingFrame(valid, buildRuntimeContext(V81_OPERATION_CONTRACT, behavior)), valid)
+
+  const missingPath = structuredClone(valid)
+  delete missingPath.execution.movement_path
+  assert.throws(() => assertTrainingFrame(missingPath), /movement_path/)
+
+  const overLimit = structuredClone(valid)
+  overLimit.execution.planned_move_steps = 3
+  assert.throws(() => assertTrainingFrame(overLimit), /outside the r2 flee contract/)
 })
 
 test('personality changes strategy and primary target on the same canonical state', () => {

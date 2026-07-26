@@ -1,16 +1,4 @@
-const crypto = require('crypto')
 const { SCHEMA_HASH: V81_SCHEMA_HASH, STRATEGY_LABELS } = require('./gcStrategyV81Contract')
-
-const V7_OPERATION_CONTRACT = Object.freeze({
-  schema_version: 1,
-  operation_version: 'gc-v7-path-aware-r1',
-  feature_version: '7.0',
-  feature_dim: 153,
-  feature_schema_id: 'gc-move-v7-path-aware-153-r1',
-  feature_schema_hash: schemaHash('gc-move-v7-path-aware-153-r1'),
-  training_version: 'v2_tick_reward',
-  output_dim: 5,
-})
 
 const V8_OPERATION_CONTRACT = Object.freeze({
   schema_version: 1,
@@ -23,7 +11,7 @@ const V8_OPERATION_CONTRACT = Object.freeze({
   output_dim: 5,
 })
 
-const V81_OPERATION_CONTRACT = Object.freeze({
+const V81_R1_OPERATION_CONTRACT = Object.freeze({
   schema_version: 1,
   operation_version: 'gc-v8-strategy-r1',
   feature_version: '8.1',
@@ -35,16 +23,18 @@ const V81_OPERATION_CONTRACT = Object.freeze({
   strategy_labels: STRATEGY_LABELS,
 })
 
+const V81_OPERATION_CONTRACT = Object.freeze({
+  ...V81_R1_OPERATION_CONTRACT,
+  operation_version: 'gc-v8-strategy-r2',
+  training_version: 'teacher-strategy-v8-r2',
+})
+
 const OPERATION_CONTRACTS = Object.freeze({
-  v7: V7_OPERATION_CONTRACT,
   v8: V8_OPERATION_CONTRACT,
   v81: V81_OPERATION_CONTRACT,
+  v81r1: V81_R1_OPERATION_CONTRACT,
 })
 const CURRENT_OPERATION_CONTRACT = V81_OPERATION_CONTRACT
-
-function schemaHash(schemaId) {
-  return `sha256:${crypto.createHash('sha256').update(schemaId).digest('hex')}`
-}
 
 function contractsEqual(left, right) {
   if (!left || !right) return false
@@ -94,13 +84,12 @@ function buildRuntimeContext(contract, behaviorProfile) {
 module.exports = {
   CURRENT_OPERATION_CONTRACT,
   OPERATION_CONTRACTS,
-  V7_OPERATION_CONTRACT,
   V8_OPERATION_CONTRACT,
   V81_OPERATION_CONTRACT,
+  V81_R1_OPERATION_CONTRACT,
   buildRuntimeContext,
   contractsEqual,
   getOperationContract,
   profileSegment,
   safeSegment,
-  schemaHash,
 }

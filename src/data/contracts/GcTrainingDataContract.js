@@ -89,6 +89,27 @@ function assertStrategyFrame(frame) {
   assertAction(frame.execution.executed_action, 'execution.executed_action')
   assertOptionalString(frame.execution.strategy_override_reason, 'execution.strategy_override_reason', true)
   assertOptionalString(frame.execution.movement_override_reason, 'execution.movement_override_reason', true)
+  if (frame.contract.operation_version === 'gc-v8-strategy-r2') {
+    assertInteger(frame.execution.planned_move_steps, 'execution.planned_move_steps', 0)
+    assertInteger(frame.execution.executed_move_steps, 'execution.executed_move_steps', 0)
+    if (frame.execution.planned_move_steps > 2 ||
+        frame.execution.executed_move_steps > frame.execution.planned_move_steps) {
+      throw new Error('execution move steps are outside the r2 flee contract')
+    }
+    if (!Array.isArray(frame.execution.movement_path) ||
+        frame.execution.movement_path.length !== frame.execution.executed_move_steps) {
+      throw new Error('execution.movement_path must match executed_move_steps')
+    }
+    for (const position of frame.execution.movement_path) {
+      if (!Array.isArray(position) || position.length !== 2 ||
+          !Number.isInteger(position[0]) || !Number.isInteger(position[1])) {
+        throw new Error('execution.movement_path contains an invalid position')
+      }
+    }
+    if (frame.execution.executed_strategy === 'flee') {
+      assertEqual(frame.execution.attack_suppressed_reason, 'flee', 'execution.attack_suppressed_reason')
+    }
+  }
 }
 
 function assertTrainingResult(result) {

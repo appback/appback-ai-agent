@@ -10,6 +10,7 @@ const {
   CURRENT_OPERATION_CONTRACT,
   V8_OPERATION_CONTRACT,
   V81_OPERATION_CONTRACT,
+  getOperationContract,
 } = require('../src/config/operationContract')
 const SqliteStore = require('../src/data/storage/SqliteStore')
 const TrainingExporter = require('../src/data/exporters/TrainingExporter')
@@ -52,6 +53,12 @@ test('operation activation blocks incompatible binary contracts until explicitly
   assert.equal(upgraded.listHistory()[0].operation_version, CURRENT_OPERATION_CONTRACT.operation_version)
 })
 
+test('v7 can no longer be selected as an operation contract', () => {
+  assert.equal(getOperationContract('v7'), null)
+  assert.equal(getOperationContract('7.0'), null)
+  assert.equal(getOperationContract('gc-v7-path-aware-r1'), null)
+})
+
 test('operation store detects an explicitly activated supported v8 contract on restart', () => {
   const dir = tempDir()
   const v8Store = new OperationVersionStore(dir, V8_OPERATION_CONTRACT)
@@ -90,7 +97,7 @@ test('operation CLI activates the isolated v8.1 strategy contract by explicit na
     encoding: 'utf8',
   })
   assert.equal(activated.status, 0, activated.stderr)
-  assert.match(activated.stdout, /Active operation: gc-v8-strategy-r1/)
+  assert.match(activated.stdout, /Active operation: gc-v8-strategy-r2/)
   assert.match(activated.stdout, /v8\.1 \/ 214 dimensions/)
   const stored = JSON.parse(fs.readFileSync(path.join(dir, 'config', 'operation.json'), 'utf8'))
   assert.equal(stored.feature_schema_hash, V81_OPERATION_CONTRACT.feature_schema_hash)

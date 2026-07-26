@@ -1,15 +1,17 @@
 const GC_PROTOCOL_VERSION = '1'
 const LOADOUT_PROFILE_CAPABILITY = 'loadout_profile_context'
 const STRATEGY_V81_CAPABILITY = 'strategy_v8_1'
+const FLEE_TWO_STEP_CAPABILITY = 'flee_two_step'
 const MODEL_AUTO_ROLLOUT_CAPABILITY = 'model_auto_rollout'
 const LOADOUT_PROFILE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/
 const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/
 
-function createClientContract(agentVersion, featureVersion) {
+function createClientContract(agentVersion, featureVersion, operationVersion = null) {
   return Object.freeze({
     protocol_version: GC_PROTOCOL_VERSION,
     agent_version: String(agentVersion || '0.0.0'),
     feature_version: String(featureVersion || 'unknown'),
+    operation_version: operationVersion ? String(operationVersion) : null,
   })
 }
 
@@ -59,6 +61,12 @@ function evaluateServerContract(server, client) {
 function assertRequiredRuntimeCapabilities(status, client) {
   if (client.feature_version === '8.1' && status.capabilities[STRATEGY_V81_CAPABILITY] !== true) {
     throw new Error('GC strategy v8.1 capability is required for feature 8.1')
+  }
+  if (
+    client.operation_version === 'gc-v8-strategy-r2' &&
+    status.capabilities[FLEE_TWO_STEP_CAPABILITY] !== true
+  ) {
+    throw new Error('GC flee two-step capability is required for operation gc-v8-strategy-r2')
   }
 }
 
@@ -147,6 +155,7 @@ function comparePrerelease(left, right) {
 
 module.exports = {
   GC_PROTOCOL_VERSION,
+  FLEE_TWO_STEP_CAPABILITY,
   LOADOUT_PROFILE_CAPABILITY,
   MODEL_AUTO_ROLLOUT_CAPABILITY,
   STRATEGY_V81_CAPABILITY,

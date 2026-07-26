@@ -7,6 +7,7 @@ const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
 const { INACTIVE_STATES } = require('./constants')
 const {
+  FLEE_TWO_STEP_CAPABILITY,
   LOADOUT_PROFILE_CAPABILITY,
   STRATEGY_V81_CAPABILITY,
   assertRequiredRuntimeCapabilities,
@@ -24,7 +25,11 @@ class GcAdapter extends BaseGameAdapter {
     super(opts)
     this.runtimeContext = opts.runtimeContext || { feature_dim: 153, feature_version: '7.0' }
     this.collectLegacyTraining = !this.runtimeContext.feature_version.startsWith('8.')
-    this.clientContract = createClientContract(opts.agentVersion, this.runtimeContext.feature_version)
+    this.clientContract = createClientContract(
+      opts.agentVersion,
+      this.runtimeContext.feature_version,
+      this.runtimeContext.operation_version
+    )
     this.api = new GcApiClient(this.config, this.clientContract)
     this.ws = new GcSocketClient(this.config)
     this.strategyEngine = new GcStrategyEngine()
@@ -155,7 +160,8 @@ class GcAdapter extends BaseGameAdapter {
         `GC contract: protocol=${serverContract.protocol_version}, ` +
         `enforcement=${status.enforcement}, feature=${this.clientContract.feature_version}, ` +
         `loadoutProfile=${this.serverCapabilities[LOADOUT_PROFILE_CAPABILITY] === true}, ` +
-        `strategyV81=${this.serverCapabilities[STRATEGY_V81_CAPABILITY] === true}`
+        `strategyV81=${this.serverCapabilities[STRATEGY_V81_CAPABILITY] === true}, ` +
+        `fleeTwoStep=${this.serverCapabilities[FLEE_TWO_STEP_CAPABILITY] === true}`
       )
       for (const warning of status.warnings) log.warn(`GC observe contract warning: ${warning}`)
     } catch (err) {

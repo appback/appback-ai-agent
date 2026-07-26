@@ -20,6 +20,9 @@ function adapter(featureVersion, behaviorProfile = PROFILE) {
     runtimeContext: {
       feature_version: featureVersion,
       feature_dim: featureVersion === '8.1' ? 214 : featureVersion === '8.0' ? 192 : 153,
+      operation_version: featureVersion === '8.1'
+        ? 'gc-v8-strategy-r2'
+        : featureVersion === '8.0' ? 'gc-v8-r1' : 'gc-v7-path-aware-r1',
     },
     agentVersion: '2.2.1',
     behaviorProfile,
@@ -72,13 +75,13 @@ test('loadout profile context is gated by the server capability', async () => {
   assert.equal(instance._getLoadoutProfileContext(), null)
 })
 
-test('v8.1 contract preflight fails closed without the strategy capability', async () => {
+test('v8.1 r2 contract preflight requires strategy and flee two-step capabilities', async () => {
   const { instance } = adapter('8.1')
   instance.api.getAgentContract = async () => ({
     protocol_version: 1,
     enforcement: 'observe',
-    accepted_feature_versions: ['7.0', '8.0', '8.1'],
-    capabilities: { strategy_v8_1: false },
+    accepted_feature_versions: ['8.0', '8.1'],
+    capabilities: { strategy_v8_1: false, flee_two_step: true },
   })
   await assert.rejects(instance._checkServerContract(), /v8\.1 contract preflight failed/)
 
@@ -90,8 +93,16 @@ test('v8.1 contract preflight fails closed without the strategy capability', asy
   instance.api.getAgentContract = async () => ({
     protocol_version: 1,
     enforcement: 'observe',
-    accepted_feature_versions: ['7.0', '8.0', '8.1'],
+    accepted_feature_versions: ['8.0', '8.1'],
     capabilities: { strategy_v8_1: true },
+  })
+  await assert.rejects(instance._checkServerContract(), /flee two-step capability/)
+
+  instance.api.getAgentContract = async () => ({
+    protocol_version: 1,
+    enforcement: 'observe',
+    accepted_feature_versions: ['8.0', '8.1'],
+    capabilities: { strategy_v8_1: true, flee_two_step: true },
   })
   await assert.doesNotReject(instance._checkServerContract())
 })

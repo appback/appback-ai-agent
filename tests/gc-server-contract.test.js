@@ -6,6 +6,7 @@ const test = require('node:test')
 const GcApiClient = require('../src/adapters/gc/GcApiClient')
 const packageVersion = require('../package.json').version
 const {
+  FLEE_TWO_STEP_CAPABILITY,
   LOADOUT_PROFILE_CAPABILITY,
   STRATEGY_V81_CAPABILITY,
   assertRequiredRuntimeCapabilities,
@@ -18,12 +19,12 @@ const {
 } = require('../src/config/GcServerContract')
 
 test('v8.1 requires the explicit strategy runtime capability even in observe mode', () => {
-  const client = createClientContract('2.2.1', '8.1')
+  const client = createClientContract('2.2.1', '8.1', 'gc-v8-strategy-r2')
   const withoutCapability = evaluateServerContract({
     protocol_version: 1,
     enforcement: 'observe',
-    accepted_feature_versions: ['7.0', '8.0', '8.1'],
-    capabilities: { strategy_v8_1: false },
+    accepted_feature_versions: ['8.0', '8.1'],
+    capabilities: { strategy_v8_1: false, flee_two_step: true },
   }, client)
 
   assert.throws(
@@ -34,11 +35,12 @@ test('v8.1 requires the explicit strategy runtime capability even in observe mod
   const ready = evaluateServerContract({
     protocol_version: 1,
     enforcement: 'observe',
-    accepted_feature_versions: ['7.0', '8.0', '8.1'],
-    capabilities: { strategy_v8_1: true },
+    accepted_feature_versions: ['8.0', '8.1'],
+    capabilities: { strategy_v8_1: true, flee_two_step: true },
   }, client)
   assert.doesNotThrow(() => assertRequiredRuntimeCapabilities(ready, client))
   assert.equal(STRATEGY_V81_CAPABILITY, 'strategy_v8_1')
+  assert.equal(FLEE_TWO_STEP_CAPABILITY, 'flee_two_step')
 
   const v8 = evaluateServerContract({
     protocol_version: 1,
@@ -46,6 +48,24 @@ test('v8.1 requires the explicit strategy runtime capability even in observe mod
     accepted_feature_versions: ['8.0'],
   }, createClientContract('2.2.1', '8.0'))
   assert.doesNotThrow(() => assertRequiredRuntimeCapabilities(v8, createClientContract('2.2.1', '8.0')))
+})
+
+test('v8.1 r2 fails closed when the server lacks flee two-step execution', () => {
+  const client = createClientContract('2.4.0', '8.1', 'gc-v8-strategy-r2')
+  const status = evaluateServerContract({
+    protocol_version: 1,
+    enforcement: 'observe',
+    accepted_feature_versions: ['8.0', '8.1'],
+    capabilities: { strategy_v8_1: true },
+  }, client)
+
+  assert.throws(
+    () => assertRequiredRuntimeCapabilities(status, client),
+    /flee two-step capability is required/
+  )
+
+  const r1 = createClientContract('2.4.0', '8.1', 'gc-v8-strategy-r1')
+  assert.doesNotThrow(() => assertRequiredRuntimeCapabilities(status, r1))
 })
 
 test('v7 bridge sends the deployed protocol and agent version headers', () => {
