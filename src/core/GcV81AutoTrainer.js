@@ -66,6 +66,9 @@ class GcV81AutoTrainer {
 
       const uploaded = await this.api.uploadModelV8(modelPath, metadata)
       const revisionId = uploaded?.revision_id || uploaded?.id || null
+      const featureVersion = uploaded?.feature_version || metadata.feature_version
+      const trainingVersion = uploaded?.training_version || metadata.training_version
+      const operationVersion = uploaded?.operation_version || metadata.operation_version
       this._writeState({
         status: 'uploaded',
         attempted_session_count: thresholdCount,
@@ -76,10 +79,19 @@ class GcV81AutoTrainer {
         revision_id: revisionId,
       })
       log.info(
-        `Uploaded v8.1 training candidate: sessions=${exported.sessionCount}, ` +
+        `Uploaded model candidate: feature=${featureVersion}, training=${trainingVersion}, ` +
+        `operation=${operationVersion}, sessions=${exported.sessionCount}, ` +
         `profile=${this.runtimeContext.behavior_profile_id}, revision=${revisionId || 'unknown'}`
       )
-      return { status: 'uploaded', sessionCount: exported.sessionCount, thresholdCount, revisionId }
+      return {
+        status: 'uploaded',
+        sessionCount: exported.sessionCount,
+        thresholdCount,
+        revisionId,
+        featureVersion,
+        trainingVersion,
+        operationVersion,
+      }
     } catch (error) {
       this._writeState({
         status: 'failed',
@@ -154,6 +166,8 @@ class GcV81AutoTrainer {
       ...previous,
       ...next,
       operation_version: this.runtimeContext.operation_version,
+      feature_version: this.runtimeContext.feature_version,
+      training_version: this.runtimeContext.training_version,
       behavior_profile_hash: this.runtimeContext.behavior_profile_hash,
       updated_at: new Date().toISOString(),
     }

@@ -59,7 +59,13 @@ function fixture() {
       uploadCalls++
       assert.equal(modelPath, path.join(outputDir, 'gc_strategy_model.onnx'))
       assert.equal(metadata.observation_policy, 'same_profile_only')
-      return { revision_id: `revision-${uploadCalls}`, status: 'uploaded' }
+      return {
+        revision_id: `revision-${uploadCalls}`,
+        status: 'uploaded',
+        feature_version: runtimeContext.feature_version,
+        training_version: runtimeContext.training_version,
+        operation_version: runtimeContext.operation_version,
+      }
     },
   }
   const autoTrainer = new GcV81AutoTrainer({
@@ -92,6 +98,9 @@ test('v8.1 auto-training exports, trains, validates, and uploads once per thresh
   const first = await subject.autoTrainer.maybeTrain()
   assert.equal(first.status, 'uploaded')
   assert.equal(first.revisionId, 'revision-1')
+  assert.equal(first.featureVersion, V81_OPERATION_CONTRACT.feature_version)
+  assert.equal(first.trainingVersion, V81_OPERATION_CONTRACT.training_version)
+  assert.equal(first.operationVersion, V81_OPERATION_CONTRACT.operation_version)
   assert.deepEqual(subject.calls(), { exportCalls: 1, trainCalls: 1, uploadCalls: 1 })
 
   assert.equal((await subject.autoTrainer.maybeTrain()).status, 'current')
@@ -107,6 +116,9 @@ test('v8.1 auto-training exports, trains, validates, and uploads once per thresh
   assert.equal(state.status, 'uploaded')
   assert.equal(state.last_success_session_count, 100)
   assert.equal(state.revision_id, 'revision-2')
+  assert.equal(state.feature_version, V81_OPERATION_CONTRACT.feature_version)
+  assert.equal(state.training_version, V81_OPERATION_CONTRACT.training_version)
+  assert.equal(state.operation_version, V81_OPERATION_CONTRACT.operation_version)
 })
 
 test('v8.1 auto-training rejects cross-profile artifacts before upload', async t => {
