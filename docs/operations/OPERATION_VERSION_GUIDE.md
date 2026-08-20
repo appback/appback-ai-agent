@@ -31,12 +31,17 @@ models/gc/generations/<operation-version>/<profile-hash>/
 npx appback-ai-agent operation show
 npx appback-ai-agent operation verify
 npx appback-ai-agent operation history
-npx appback-ai-agent operation activate v7 --yes
 npx appback-ai-agent operation activate v8 --yes
 npx appback-ai-agent operation activate v81 --yes
 ```
 
-`v8`은 실험 이동 계약 `8.0/192/5`, `v81`은 전략 계약 `8.1/214/11`이다. `init` 또는 최초 실행은 v7 계약을 기본 초기화한다. v8 계열은 대상 agent에서만 명시적으로 활성화한다. 저장된 계약은 재시작 시 자동 감지되며 계약과 다른 데이터, export, model은 사용할 수 없다.
+`v8`은 실험 이동 계약 `8.0/192/5`, `v81`은 전략 계약 `8.1/214/11`이다. 현재
+`CURRENT_OPERATION_CONTRACT`와 신규 설치 기본값은 `gc-v8-strategy-r2`다. 저장된 계약은
+재시작 시 자동 감지되며 binary 계약과 다른 데이터, export, model은 사용할 수 없다.
+
+`v7` operation 선택은 현재 binary에서 제거됐다. 관련 builder/runtime code와 테스트는 감사·회귀
+검증용으로 남아 있지만 `operation activate v7`은 거부된다. 현재 GC 서버도 observe mode에서
+`8.0,8.1`만 광고한다.
 
 ## GC 서버 전환 연동
 
@@ -47,7 +52,11 @@ X-GC-Protocol-Version: 1
 X-AI-Agent-Version: <package semver>
 ```
 
-시작할 때 `GET /api/v1/agent-contract`를 조회한다. `observe`에서는 불일치를 경고만 하고 기존 v7 실행을 유지한다. `strict`에서 protocol, feature version 또는 minimum agent version이 맞지 않으면 등록·queue 진입 전에 시작을 중단한다.
+시작할 때 `GET /api/v1/agent-contract`를 조회한다. 현재 서버 계약은 observe mode에서
+feature `8.0,8.1`을 광고하고 v7은 광고하지 않는다. observe에서는 일반적인 version 불일치를
+경고로 기록하지만, v8.1은 필수 capability 또는 계약 조회가 없으면 시작을 중단한다. strict에서
+protocol, feature version 또는 minimum agent version이 맞지 않으면 등록·queue 진입 전에
+시작을 중단한다.
 
 feature version은 로컬 운영 계약과 서버의 `accepted_feature_versions`/`required_feature_version`을 비교한다. ONNX 업로드 시에는 별도의 모델 metadata로 다시 검증한다.
 
@@ -64,7 +73,11 @@ npx appback-ai-agent start
 
 `activate v8 --yes`는 이전 계약을 `config/operation.history/`에 보관하고 v8 계약을 활성화한다. 기존 데이터나 모델을 삭제하지 않지만 새 운영 세대에서는 조회하거나 로드하지 않는다.
 
-v8.1 Round 6 격리 E2E는 완료됐으며 운영 전환 전까지 테스트 agent에서만 다음을 사용한다. GC `/agent-contract`가 `8.1`을 광고하고 `capabilities.strategy_v8_1=true`를 반환하며 canonical schema hash가 일치해야 한다. v8.1은 observe 모드에서도 capability가 없거나 계약 조회가 실패하면 시작을 중단한다. 이는 feature 번호만 먼저 광고된 불완전한 서버에서 전략 모델을 실행하지 않기 위한 예외적인 fail-closed 규칙이다.
+v8.1은 격리 E2E와 운영 canary를 거쳐 관리 대상 agent의 기본 경로로 전환됐다. 신규 설치도
+v8.1 r2를 초기화한다. GC `/agent-contract`가 `8.1`을 광고하고
+`capabilities.strategy_v8_1=true`, `capabilities.flee_two_step=true`를 반환하며 canonical
+schema hash가 일치해야 한다. 조건이 없거나 계약 조회가 실패하면 observe mode에서도 시작을
+중단한다.
 
 ```bash
 npx appback-ai-agent operation activate v81 --yes
@@ -115,12 +128,14 @@ rollback은 금지된다. 실제 frame을 수집한 뒤 `same_profile_only` prov
 않으며 별도 bootstrap 생성 또는 raw observation 재라벨링이 필요하다. bootstrap 업로드 실패는
 프로세스를 재시작시키지 않고 training sync 주기에서 재시도한다.
 
-## v8 전환 원칙
+## Legacy 계약 처리 원칙
 
-1. GC 서버의 v8 API와 canary 모델 준비를 확인한다.
-2. 대상 agent에서만 `operation activate v8 --yes`를 실행한다.
-3. `operation verify`와 `doctor`가 v8 192차원 계약을 확인하는지 검사한다.
-4. v8 성격별 데이터는 0게임부터 새로 수집한다.
-5. v8 데이터로 학습된 모델만 v8 generation 경로에서 업로드한다.
+1. 신규 설치는 v8.1 r2를 사용한다.
+2. 기존 v7/v8.0 설정은 자동 변환하지 않고 명시적으로 분리 보관한다.
+3. 전환 전 DB·모델을 백업하고 v8.1 profile별 generation은 새로 시작한다.
+4. `operation verify`와 `doctor`가 `8.1 / 214 / 11` 계약을 확인해야 한다.
+5. v8.1 데이터로 학습되고 gate를 통과한 모델만 v8.1 revision으로 업로드한다.
 
-기존 v7 DB와 ONNX는 즉시 삭제하지 않는다. 롤백 및 감사용으로 보관하고, 보존기간이 지난 후 별도 운영 절차로 정리한다.
+기존 v7 DB와 ONNX는 운영 입력으로 재사용하지 않는다. 필요한 감사 자료는 체크섬 백업으로
+격리하고 보존기간이 지난 후 별도 운영 절차로 정리한다. v8.1 active revision을 v7 artifact로
+rollback하지 않는다.

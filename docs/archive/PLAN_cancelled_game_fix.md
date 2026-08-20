@@ -2,8 +2,10 @@
 
 ## 문서 정보
 - 작성일: 2026-03-14
-- 상태: 검증 대기
+- 상태: 구현·검증 완료, archive
 - 대상 버전: v1.0.12
+- 현재 확인: `INACTIVE_STATES`에 `cancelled` 포함, reconnect/discovery 정리와
+  `game_cancelled` socket handler 구현 (`src/adapters/gc/GcAdapter.js`, `GcSocketClient.js`)
 
 ## 문제 정의
 

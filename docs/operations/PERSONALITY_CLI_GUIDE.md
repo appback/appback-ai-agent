@@ -2,7 +2,11 @@
 
 AI Agent의 행동 성격을 Easy 또는 Expert 모드로 설정하는 관리자 가이드다.
 
-현재 구현 범위는 성격 설정, 검증, revision, backup, 런타임 식별과 성격 기반 장비 선택까지다. 장비 선호는 agent 재시작 후 다음 challenge부터 적용된다. 이동 모델은 즉시 변경하지 않으며 v8 학습에서 profile hash가 같은 새 모델을 생성해야 반영된다. GC가 `loadout_profile_context` capability를 제공하면 challenge에 성격 ID/hash/revision도 함께 기록되고, 미지원 서버에는 기존 장비 payload만 전송한다.
+현재 구현 범위는 성격 설정, 검증, revision, backup, 런타임 식별, 성격 기반 장비 선택과
+v8.1 profile별 자동 학습·후보 업로드까지다. 장비 선호는 agent 재시작 후 다음 challenge부터
+적용된다. active 전략 모델은 즉시 변경하지 않으며 같은 profile hash의 새 모델이 GC runtime
+gate를 통과해야 반영된다. GC가 `loadout_profile_context` capability를 제공하면 challenge에
+성격 ID/hash/revision도 함께 기록되고, 미지원 서버에는 기존 장비 payload만 전송한다.
 
 ---
 
@@ -263,7 +267,7 @@ pm2 logs ai-agent --lines 30
 - 설정 변경은 실행 중 게임의 장비를 바꾸지 않는다.
 - 재시작 후 다음 challenge부터 새 성격으로 장비를 선택한다.
 - 초기 선택은 성격 선호를 우선하며, 이후 같은 성격에서 쌓인 평균 순위와 탐색 점수가 반영된다.
-- 장비 결과는 `operation_version + profile hash`별로 저장되므로 v7/v8 또는 다른 성격의 기록과 섞이지 않는다.
+- 장비 결과는 `operation_version + profile hash`별로 저장되므로 v8.0/v8.1 또는 다른 성격의 기록과 섞이지 않는다.
 - `personality show`의 `Equipment preferences`에서 실제 적용 가중치를 확인한다.
 
 ```bash
@@ -295,12 +299,13 @@ GC가 제공하는 frame의 profile hash는 실제 추론에 사용한 모델 re
 
 ---
 
-## 7. 현재 제한사항
+## 7. 현재 적용 규칙과 제한사항
 
-- 성격 설정은 v7 이동 모델의 ONNX 행동을 변경하지 않지만 장비 선택에는 적용된다.
+- 성격 설정은 현재 active ONNX를 즉시 바꾸지 않지만 장비 선택에는 다음 challenge부터 적용된다.
 - 실행 중인 agent는 설정 파일을 hot reload하지 않으므로 성격 변경 후 재시작해야 한다.
 - CLI의 `Deployed` 표시는 아직 서버 active revision 조회와 연결되지 않았다.
 - v8.1은 현재 성격의 완료 게임 50건마다 자동학습·offline gate·후보 업로드를 수행한다.
-- 후보의 canary·active·known-good 전환은 관리자 승인 전까지 자동화하지 않는다.
+- GC가 `model_auto_rollout=true`를 광고하면 후보의 canary와 30게임 runtime gate를 자동 수행하고,
+  통과한 revision만 active로 전환한다. global strict와 minimum agent version 전환은 별도 승인 대상이다.
 
 따라서 현재 단계에서 `personality set`은 운영 중인 ONNX 모델을 교체하지 않는다. 다만 agent를 재시작하면 다음 challenge부터 새 profile hash의 장비 선호와 별도 성과 기록을 사용한다.

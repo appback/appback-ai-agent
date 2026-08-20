@@ -1,14 +1,17 @@
 # GC AI 계층형 전략 v8.1 공동 개발계획
 
-상태: **revision 2, Round 6 격리 테스트 서버 E2E 완료, Round 7 품질 검증 대기**
-작성 기준: AI Agent `7c9ab97`, GC `7886dadd`
+상태: **revision 2, v8.1 운영 전환 및 r2 two-step flee 반영, global strict 미전환**
+작성 기준: AI Agent `2.4.1`, GC `ad866ec9` 이후 현재 코드
 상위 계약: `GC_TRAINING_DATA_INTEGRATION.md`
 
-## GC 담당자 전달 지시
+## 현재 공동 계약 요약
 
-**GC 담당자에게는 이 파일 하나만 전달한다.** Round 2 계약 검토, Round 4 canonical 구현, Round 5 AI Agent parity가 완료됐다.
-
-GC `7886dadd`에서 v8.1 runtime, record v2, capability, AOE 격리 경로와 관리자 rollout registry 보강을 완료했다. 격리 테스트 서버에서 214/11 fixture upload, canary 지정, 실게임 record v2 생성, AI Agent cursor 수집까지 Round 6 E2E가 통과했다. 다음 공동 작업은 다수 canary 게임으로 품질 지표와 v7 baseline을 산출하는 Round 7이며, 승인 전에는 운영 배포와 strict 전환을 수행하지 않는다.
+Round 2 계약 검토, Round 4 canonical 구현, Round 5 parity, Round 6 격리 E2E와 Round 7
+운영 canary를 완료했다. 관리 대상 agent는 v8.1 `214/11` active revision으로 전환됐고,
+신규 설치 기본 operation은 `gc-v8-strategy-r2`다. GC는 v8.1 자동 rollout과 two-step flee를
+지원한다. global protocol은 여전히 observe이며 서버가 광고하는 accepted feature는
+`8.0,8.1`이다. GC의 v7 실행 코드와 AI Agent 회귀 코드는 legacy 참고용으로 남지만 현재
+광고 계약이 아니며 AI Agent operation으로 선택할 수도 없다.
 
 ## 1. 재설계 결론
 
@@ -391,7 +394,7 @@ revision 2 식별자:
 - model validator는 schema hash, 214 input, 11 output, label 순서를 모두 검사
 - v8.1 known-good revision 없이 strict 전환하지 않음
 - Go API와 inference sidecar는 `(feature_version, schema_hash)` contract registry로 v8.0 192/5와 v8.1 214/11을 동시에 검증
-- observe accepted versions는 `7.0,8.0,8.1`; v8.1 capability 확인 전 AI Agent는 upload·activation하지 않음
+- observe accepted versions는 현재 `8.0,8.1`; v8.1 capability 확인 전 AI Agent는 upload·activation하지 않음
 - sidecar는 mask 전 `raw_argmax_strategy`와 mask 후 `model_strategy`를 모두 반환
 - v8.0 삭제는 known-good 8.1 지정 및 active/canary v8.0 pointer 0개 확인 후 수행
 
@@ -529,7 +532,7 @@ GC `7886dadd`에서 관리자 canary/activate/rollback 검사를 `featurecontrac
 
 ### Round 7: 성격별 bootstrap canary 후보
 
-상태: **AI Agent 산출물 완료, GC canary 대기**
+상태: **완료 — 운영 canary 수집 및 관리 대상 agent 전환**
 
 AI Agent는 실제 v8.1 frame이 아직 보존되지 않은 초기 상태를 운영 데이터로 위장하지 않고
 `synthetic_bootstrap` provenance로 다음 네 후보를 각각 생성한다.
@@ -551,19 +554,22 @@ synthetic session 256개와 sample 2,048개다. `collector`는 powerup capabilit
 - profile 쌍별 strategy disagreement: `37.9395%`~`84.5215%`
 - GC model-inference validator: 네 모델 모두 feature `8.1`, schema hash 일치, shape `214/11`, HTTP-equivalent status `200`
 
-이 모델들은 실제 게임 frame을 수집하기 위한 canary 전용이다. 운영 active, known-good, rollback,
-strict 전환에 사용하지 않는다. GC는 모델 수령 후 profile별 upload/canary, 3게임 smoke,
-profile별 30게임 수집을 수행한다. 이후 AI Agent가 실제 frame을 `same_profile_only`로 재학습한다.
+이 bootstrap 모델들은 실제 게임 frame을 수집하기 위한 canary 전용이며 active/known-good/
+rollback 대상으로 사용하지 않는다. 이후 운영 canary 73게임과 9,261 frame을 수집했고,
+관리 대상 네 agent는 실제 frame provenance를 갖는 profile별 v8.1 active revision으로 전환했다.
+AI Agent `2.3.3`부터 같은 profile의 authoritative session을 자동 재학습하고, GC의 자동 rollout
+gate에 immutable 후보를 전달한다.
 
 ### Round 8: 운영 전환
 
-상태: **미착수**
+상태: **부분 완료 — 관리 대상 전환·자동 rollout·r2 실행 계약 완료, global strict 미전환**
 
-- 실제 frame 기반 후보의 canary 품질 게이트 승인
-- known-good 8.1 revision 지정
-- v8.1 agent 범위 확대
-- 구 v8.0 test revision 폐기
-- 마지막에 strict 최소 버전 전환
+- 관리 대상 agent의 v8.1 active revision 및 실제 frame smoke: 완료
+- 50게임 자동 학습·후보 업로드와 GC 30게임 runtime gate: 완료
+- `gc-v8-strategy-r2` two-step flee와 `flee_two_step` capability: 완료
+- 서버 광고 계약에서 v7 제거: 완료 (`8.0,8.1` observe)
+- 접근 불가·별도 운영 agent 상태 확인과 잔여 legacy artifact 정리: 환경별 수행
+- global strict와 minimum agent version 전환: 미실시
 
 ## 11. 품질 게이트
 
@@ -584,7 +590,9 @@ baseline이 없는 `2-cycle/3-cycle < v7` 조건은 현재 release blocker로 �
 
 ## 12. 작업 순서
 
-Round 6까지 완료했다. GC와 AI Agent의 8.1 계약은 fixture parity뿐 아니라 격리 테스트 서버의 실제 upload, canary, battle, record v2, cursor consumer 경로에서도 연결됐다.
+Round 8의 관리 대상 운영 전환까지 완료했다. GC와 AI Agent의 8.1 계약은 fixture parity,
+upload, canary, battle, record v2, cursor consumer, 자동 재학습·rollout과 r2 flee 실행 경로에서
+연결됐다.
 
 1. GC 계약 검토 및 수정안 회신: 완료
 2. AI Agent 계획서 revision 2 확정: 완료
@@ -594,16 +602,15 @@ Round 6까지 완료했다. GC와 AI Agent의 8.1 계약은 fixture parity뿐 �
 6. GC 관리자 canary/activate/rollback의 8.0/8.1 registry 전환 및 회귀 테스트: 완료 (`7886dadd`)
 7. 격리 test server model upload/canary E2E: 완료
 8. 성격별 synthetic bootstrap 후보 생성·오프라인 차별성 검증: 완료
-9. 격리 테스트 서버 profile별 3게임 smoke 및 30게임 품질 수집
-10. 실제 frame 기반 `same_profile_only` 재학습과 품질 게이트 승인
-11. npm 배포 및 관리 agent 순차 업데이트
-12. known-good v8.1 확보 후 별도 승인으로 운영 확대·strict 검토
+9. 운영 canary 품질 수집: 완료 (73게임, 9,261 frame)
+10. 실제 frame 기반 `same_profile_only` 재학습과 품질 게이트: 완료
+11. npm 배포 및 관리 agent 순차 업데이트: 완료 (`2.4.1` 기준)
+12. 자동 rollout과 r2 two-step flee: 완료
+13. 잔여 환경 점검 후 global strict/minimum version 전환: 별도 승인 대기
 
 ## 13. 남은 확인 항목
 
-- target 사망·동적 충돌·AOE가 실제 발생한 canary frame에서 fixture와 동일하게 기록되는지
-- 다수 personality 모델이 동일 전투 상태에서 서로 다른 전략과 target을 안정적으로 선택하는지
-- synthetic 후보의 profile별 3게임 smoke와 30게임 canary 결과
-- 실제 frame 기반 `same_profile_only` 재학습 후보가 synthetic 후보보다 개선되는지
-- v7 baseline과 v8.1 canary 품질 지표 산출
-- v8.0 test 데이터·revision 폐기 시점은 Round 7에서 운영 pointer 확인 후 결정
+- 접근 불가·별도 운영 agent의 실제 operation과 model pointer 확인
+- v8.0 pointer와 test revision 잔존 여부를 운영 DB 기준으로 확인한 뒤 폐기
+- global strict/minimum agent version 전환 전 모든 active agent 호환성 재검증
+- target 사망·동적 충돌·AOE·two-step flee의 장기 runtime 지표 감시

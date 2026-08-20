@@ -10,7 +10,7 @@ npm 배포 + 운영 에이전트 업데이트 절차.
 cd ~/projects/appback-ai-agent
 
 # 버전 업
-# (semver: patch 2.2.x = fix, minor 2.x.0 = feature, major x.0.0 = breaking)
+# (semver: patch = fix, minor = feature, major = breaking)
 vim package.json   # version 수정
 
 # 변경 사항 커밋
@@ -104,29 +104,29 @@ docker inspect appback-ai-agent-hunter --format '{{.State.Health.Status}} {{.Res
 
 특정 버전으로 되돌리기:
 ```bash
-npm install -g appback-ai-agent@2.1.3
+npm install -g appback-ai-agent@<approved-version>
 pm2 restart ai-agent
 ```
 
+package rollback은 binary만 바꾸며 operation/data/model contract를 자동으로 되돌리지 않는다.
+`operation verify`가 실패하면 기존 `operation.json`과 세대가 맞는 승인 버전을 사용해야 한다.
+
 ---
 
-## Model Hot-Swap
+## v8.1 Model Rollout
 
-학습된 모델을 서버에 즉시 적용:
+v8.1 모델을 legacy `POST /agents/me/model`로 직접 hot-swap하지 않는다. AI Agent가
+authoritative session을 export·학습·평가한 뒤 metadata와 함께
+`POST /agents/me/models/v8`에 immutable 후보 revision을 업로드한다.
 
 ```bash
-TOKEN=$(sqlite3 ~/data/agent.db "SELECT api_token FROM agent_identity WHERE game='claw-clash'")
-curl -X POST https://clash.appback.app/api/v1/agents/me/model \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "model=@$HOME/models/gc/gc_move_model.onnx"
+npx appback-ai-agent operation verify
+npx appback-ai-agent export
+npx appback-ai-agent train
 ```
 
-성공 응답:
-```json
-{"success":true,"model_version":N,"input_dim":153,"output_dim":5}
-```
-
-서버 측에서 LRU 캐시 무효화 후 다음 게임부터 새 모델 사용.
+GC가 `model_auto_rollout=true`를 광고하면 canary와 30게임 runtime gate를 수행하고 통과한
+revision만 active로 전환한다. 수동 active/rollback은 GC 관리자 절차와 audit를 사용한다.
 
 ---
 
@@ -141,7 +141,7 @@ curl -X POST https://clash.appback.app/api/v1/agents/me/model \
 
 2. **기동 로그**
    ```bash
-   pm2 logs ai-agent --lines 20 --nostream | grep "starting\|Registered\|WebSocket"
+   pm2 logs ai-agent --lines 30 --nostream | grep "starting\|Operation contract\|GC contract\|server-owned"
    ```
 
 3. **게임 참가**
@@ -167,13 +167,9 @@ pm2 restart all
 ### 모델 버전 확인 (서버)
 ```bash
 TOKEN=$(sqlite3 ~/data/agent.db "SELECT api_token FROM agent_identity WHERE game='claw-clash'")
-curl -s https://clash.appback.app/api/v1/agents/me -H "Authorization: Bearer $TOKEN" | jq '.model_version, .model_uploaded_at'
+curl -s https://clash.appback.app/api/v1/agents/me/models/v8 \
+  -H "Authorization: Bearer $TOKEN" | jq
 ```
 
-### 잘못된 모델 삭제
-```bash
-TOKEN=$(sqlite3 ~/data/agent.db "SELECT api_token FROM agent_identity WHERE game='claw-clash'")
-curl -X DELETE https://clash.appback.app/api/v1/agents/me/model \
-  -H "Authorization: Bearer $TOKEN"
-```
-삭제 후에는 서버가 폴백 휴리스틱으로 동작.
+잘못된 v8 후보를 legacy delete API로 제거하지 않는다. rejected/rollback 상태와 active pointer는
+GC revision audit를 보존하는 관리자 절차로 변경한다.

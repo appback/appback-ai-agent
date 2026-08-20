@@ -108,7 +108,7 @@ AI Agent의 effective `behavior_profile_hash`에는 이동 목표·정책뿐 아
 - `behavior_profile_hash`는 서버 ONNX 모델 성격, `loadout_profile_hash`는 challenge 장비 선택 성격으로 의미를 분리한다.
 - 서버가 필드를 지원하기 전 AI Agent가 임의로 전송하지 않는다. GC 배포 후 agent-contract capability를 확인하고 활성화한다.
 - `capabilities.loadout_profile_context=true`는 서버의 수신·저장 지원만 뜻하며 현재 요청에서 필수라는 의미가 아니다.
-- v7 호환 기간에는 세 필드를 선택사항으로 허용한다. 향후 v8 필수화는 별도 enforcement 계약과 최소 AI Agent 버전을 확정한 뒤 진행한다.
+- 세 필드는 현재도 optional이며 필수화는 별도 enforcement 계약과 최소 AI Agent 버전을 확정한 뒤 진행한다. v7은 현재 서버 광고 계약에서 제외됐다.
 - contract preflight 실패, capability 누락 또는 `false`이면 기존 weapon/armor/tier만 전송한다.
 - capability가 `true`이면 AI Agent는 effective profile에서 완전한 세 필드를 생성하고 로컬 형식 검증 후 전송한다. 부분 tuple은 client 경계에서 차단한다.
 
@@ -167,8 +167,8 @@ AI Agent 준비 완료:
 - schema 불일치 시 cursor 미갱신
 - HTTP 410 cursor 만료를 domain error로 변환하고 checkpoint 보존
 - GC `0f2c33b4`의 frame에 누락된 `agent.slot`은 session `agent_slot`으로 보강한 뒤 검증·저장
-- 신규 설치의 기본 operation은 v8.1이며 기존 v7/v8.0 설정은 명시적으로 유지되는 동안만 호환
-- `operation activate v8 --yes`인 agent에서만 cursor consumer scheduler 활성화
+- 신규 설치의 기본 operation은 v8.1 r2이며 v7 operation 선택은 제거됨. v8.0은 격리 실험용으로만 명시적 선택 가능
+- feature version이 v8.x인 agent에서 cursor consumer scheduler 활성화
 - v8에서는 legacy viewer snapshot 수집을 차단하고 v8.1 authoritative feed 자동학습을 사용
 - 현재 성격의 완료 세션 50건마다 `same_profile_only` export, 214→11 학습, offline gate, 후보 업로드 수행
 - 관리자 profile 기반 BFS teacher, sample weight와 192차원 CSV/manifest export
@@ -182,15 +182,18 @@ AI Agent 준비 완료:
 - 성격별 11-class strategy teacher와 primary target label 생성
 - 214차원 exporter와 `gc_strategy_net` 214→11 trainer·metadata 구현
 
-GC 서버 코드 및 격리 테스트 서버 완료, 운영 배포 필요:
+GC 서버 구현 및 운영 연결 완료:
 
 - training session/frame/result 저장소와 cursor API 구현
 - v8 canary/active Engine.Run, NavigationHistory, NavigationSafety 연결
 - model canary/activate/rollback과 canonical fixture 구현
-- v8 engine/training 기준 commit: `0f2c33b4ecdc020b582a5f22e46f35d5ff47e951`
+- v8 engine/training 초기 기준 commit: `0f2c33b4ecdc020b582a5f22e46f35d5ff47e951`
 - loadout profile 계약 기준 commit: `6cdc6c403e794d53e7bdade2862d616cf189532e`
-- 격리 테스트 서버는 `loadout_profile_context=true`, observe 모드로 검증
+- v8.1 runtime, record v2, 자동 rollout과 r2 two-step flee 운영 연결 완료
+- 현재 agent contract: observe `8.0,8.1`, `strategy_v8_1`, `flee_two_step`, `model_auto_rollout`
 
-저장된 raw state와 관리자 profile을 결합하는 BFS `teacher_action`/`sample_weight`와 v8 export·학습 입력 분리는 구현됐다. 격리 테스트 서버에서 loadout profile challenge HTTP 201/queued와 queue cleanup까지 확인했다. 남은 E2E는 v8 canary 지정, 실제 게임 생성, session/result의 loadout profile snapshot 확인, cursor 수집과 모델 upload다.
+저장된 raw state와 관리자 profile을 결합하는 teacher/sample weight, v8 export·학습 입력 분리,
+실제 게임 record v2, cursor 수집과 모델 upload E2E까지 완료했다. 남은 전환은 모든 별도 운영
+agent의 호환성을 재확인한 뒤 수행할 global strict/minimum version 적용이다.
 
 GC 후속 수정 필요: 합의된 frame wire contract대로 `agent: {"slot": n}`을 frame payload에 직접 포함해야 한다. 현재 AI Agent의 session 기반 보강은 `0f2c33b4` 호환을 위한 임시 방어다.

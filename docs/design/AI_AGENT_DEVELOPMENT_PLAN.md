@@ -2,11 +2,15 @@
 
 관리자가 AI Agent에 성격을 부여하고, 선택한 성격에 따라 데이터 라벨·학습 가중치·최종 모델 행동이 달라지게 만드는 실행 계획이다.
 
-상위 방향은 `AI_AGENT_ADVANCEMENT_PLAN.md`를 따르며, 이 문서는 `appback-ai-agent` 저장소가 구현할 범위와 CLI 사용 계약을 정의한다.
+상위 구조는 `../overview/ARCHITECTURE.md`, 계층형 전략 계약은
+`GC_AI_STRATEGY_V8_PLAN.md`를 따른다. 이 문서는 `appback-ai-agent` 저장소의 구현 상태와 CLI
+사용 계약을 정의한다.
 
 ## 구현 상태
 
-- v8.1 계층형 전략 계약 및 Round 6 격리 E2E 완료: 214차원/11전략 모델, GC BFS 실행기, record v2, cursor consumer 연동을 검증했다. 기준 문서: `GC_AI_STRATEGY_V8_PLAN.md`
+- v8.1 계층형 전략 운영 전환 완료: 214차원/11전략 모델, GC BFS 실행기, record v2,
+  cursor consumer, 자동 재학습·rollout과 r2 two-step flee 연동을 검증했다. 기준 문서:
+  `GC_AI_STRATEGY_V8_PLAN.md`
 
 - AA-1 완료: Easy/Expert 설정, variation/seed, 장비 선호, 검증, revision/history/rollback, CLI, doctor 확인, 운영 가이드
 - AA-2 완료: GC authoritative frame consumer, BFS 교사 라벨, 성격별 sample weight, 192차원 export와 Python 학습 입력 분리
@@ -15,7 +19,8 @@
 - 기존 v8.0 ONNX 생성·upload·canary는 운영 학습 경로에서 제외한다.
 - 현재 성격 변경은 기존 운영 모델을 즉시 변경하지 않는다.
 - 운영 버전 관리 완료: operation/feature/training/profile 계약별 DB·export·모델 경로 격리, CLI 전환 차단
-- GC-1 연동 완료: v7 동작을 유지한 protocol/agent-version bridge header, agent-contract preflight, strict 조기 차단
+- GC-1 연동 완료: protocol/agent-version bridge header, agent-contract preflight, v8.1 capability
+  fail-closed와 strict 조기 차단. 현재 서버 광고 계약은 observe `8.0,8.1`이며 v7은 legacy 코드로만 유지
 - GC training data 계약 확정: authoritative vector + raw pre-state, cursor API, teacher/model/executed action 분리
 - consumer runtime 구현 완료: v8 operation 전용 scheduler, frame/result/session validator, SQLite 멱등 저장, operation별 cursor checkpoint
 - GC loadout profile 계약 완료: 서버 migration/API/queue/session/result/capability와 AI Agent capability 기반 challenge 전송 구현. capability는 지원 여부만 나타내며 필수화는 별도 전환

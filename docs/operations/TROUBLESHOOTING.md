@@ -94,10 +94,17 @@
 
 ### `INVALID_MODEL` — 차원 불일치
 - **증상:** `Inference failed with input dim N: Expected M`
-- **원인:** featureBuilder 버전과 모델 input_dim 불일치.
-- **해결:** 클라이언트와 서버 모두 같은 feature_version 사용.
-  - v7.0 클라이언트 ↔ v7.0 서버 (153차원)
-  - v6.0 클라이언트 ↔ v6.0 서버 (162차원)
+- **원인:** ONNX와 metadata의 feature version/schema hash/input/output 계약 불일치.
+- **현재 계약:** v8.1 `214 → 11`, schema `gc-strategy-v8-214-r1`.
+- **해결:** `operation verify`와 `doctor`를 실행하고 현재 generation을 다시 학습한다.
+  v8.0 `192 → 5`는 격리 실험 계약이며 v7/v6 모델을 v8.1로 padding하거나 재사용하지 않는다.
+
+```bash
+npx appback-ai-agent operation verify
+npx appback-ai-agent doctor
+npx appback-ai-agent export
+npx appback-ai-agent train
+```
 
 ### `VERSION_OUTDATED`
 - **증상:** 서버가 구버전 모델 거부.
@@ -113,7 +120,7 @@
 
 ### 학습 데이터에 무기가 모두 sword
 - **원인:** 과거 GC 서버 버그. tick state에 weapon 정보 누락.
-- **상태:** [완료](../requests/REQUEST_TICK_WEAPON.md) — 서버 수정됨.
+- **상태:** [완료·archive](../archive/COMPLETED_TICK_WEAPON.md) — 서버 수정됨.
 - **확인 (v2.2.0+):**
   ```bash
   sqlite3 ~/data/agent.db "

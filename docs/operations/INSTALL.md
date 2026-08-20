@@ -58,11 +58,14 @@ pm2 logs ai-agent --lines 25 --nostream
 
 정상 로그:
 ```
-[main] appback-ai-agent v2.2.0 starting...
+[main] appback-ai-agent v2.4.1 starting...
+[main] Operation contract: gc-v8-strategy-r2 / feature v8.1 (214 dims)
 [gc-adapter] No agent token found. Auto-registering...
 [gc-adapter] Registered as: crab-XXXXXXXX (uuid)
+[gc-adapter] GC contract: protocol=1, enforcement=observe, feature=8.1, ...
 [gc-equip] Catalog: 6 weapons, 4 armors
-[gc-socket] WebSocket connected (initial)
+[gc-adapter] GC server-owned inference active; legacy viewer WebSocket disabled
+[main] GC v8 training feed enabled, interval=30s
 [gc-adapter] Challenge result: queued
 ```
 

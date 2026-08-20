@@ -157,82 +157,68 @@ echo 'PYTHON_PATH=.venv/bin/python3' >> .env
 - `HEALTH_PORT` — 헬스체크 포트 (기본: `9090`)
 - `LOG_LEVEL` — 로그 레벨 (기본: `info`)
 
-## 배틀 엔진 v6.0
+## 현재 GC AI 계약
 
-에이전트는 ClawClash 배틀 엔진 v6.0과 호환됩니다.
+현재 기본 운영 계약은 **v8.1 계층형 전략 모델**입니다.
 
-- **통합 턴 시스템**: 2 phase (각 500ms) — Phase 0: 패시브, Phase 1: 액션
-- **ML 이동 제어**: 학습된 ONNX 모델을 서버에 업로드, 서버가 추론
-- **자동 공격**: 이동 후 서버가 `scoreTarget()`으로 최적 타겟 자동 선택
-- **162차원 피처 벡터**: 지형, BFS 경로, 액션 마스크 포함
-- **5클래스 출력**: stay / up / down / left / right
+- **214차원 입력**: GC 서버가 생성한 authoritative feature vector
+- **11전략 출력**: hold, flee, seek_powerup, explore, attack_candidate_0~6
+- **책임 분리**: 모델은 전략·대상을 고르고, GC 서버는 BFS 경로와 실제 이동·공격을 실행
+- **서버 추론**: AI Agent가 ONNX 후보를 업로드하면 GC가 계약 검증과 runtime gate를 수행
+- **authoritative 학습 feed**: session/frame/result를 cursor 방식으로 수집하며 로컬 viewer snapshot은 v8.x 학습에 사용하지 않음
+- **legacy 참고**: v7.0 `153→5` 이동 코드와 회귀 테스트는 남아 있지만 현재 operation으로 선택할 수 없고 신규 설치에도 사용하지 않음
 
 ## 아키텍처
 
 ```
-                    ┌──────────────────┐
-                    │   AgentManager   │
-                    │  (orchestrator)  │
-                    └────────┬─────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-        ┌─────┴─────┐ ┌─────┴─────┐ ┌─────┴─────┐
-        │ GcAdapter  │ │  (future) │ │  (future) │
-        │ ClawClash  │ │  MMO game │ │  ...      │
-        └─────┬──────┘ └───────────┘ └───────────┘
-              │
-    ┌─────────┼──────────┬────────────┐
-    │         │          │            │
-┌───┴───┐ ┌──┴───┐ ┌────┴────┐ ┌────┴─────┐
-│  API  │ │Socket│ │Strategy │ │Equipment │
-│Client │ │Client│ │ Engine  │ │ Manager  │
-└───────┘ └──────┘ └────┬────┘ └──────────┘
-                        │
-              ┌─────────┼─────────┐
-              │         │         │
-         ┌────┴───┐ ┌──┴───┐ ┌──┴──────┐
-         │Feature │ │ ONNX │ │Heuristic│
-         │Builder │ │Model │ │Fallback │
-         └────────┘ └──────┘ └─────────┘
+AgentManager → GcAdapter → GC REST discovery/challenge
+                    │
+                    ├─ EquipmentManager (성격별 장비)
+                    ├─ ModelBootstrapper (초기 v8.1 후보)
+                    └─ TrainingDataConsumer ← GC authoritative feed
+                                           │
+                                           v
+                          SQLite → Exporter → 214→11 Trainer
+                                                   │
+                                                   v
+                                    GC candidate upload/rollout
 ```
 
 ## 자기 개선 루프
 
 ```
-게임 탐색 → 참가 → 전투 (틱 데이터 수집)
+게임 탐색 → 참가 → GC 서버 전투·추론
                          ↓
-               SQLite 저장 (세션/틱/피처)
+        authoritative session/frame/result 동기화
+                         ↓
+             SQLite 저장 + profile별 격리
                          ↓
               N 게임마다 자동 트리거 (기본 50)
                          ↓
-              CSV 익스포트 → Python 훈련
+           teacher strategy 생성 → Python 훈련
                          ↓
-              ONNX 모델 생성 → 핫리로드
+           ONNX 후보 업로드 → GC 품질 gate
                          ↓
-              다음 게임부터 새 모델 적용
+              통과한 revision만 active 전환
 ```
 
 ## 학습 파이프라인
 
 ### 모델 구조
 
-MLP 3-layer: `162 → 64 → 32 → 5` (stay/up/down/left/right)
+MLP: `214 → 128 → 64 → 11`
 
 ### 가중치 정책
 
-1. **점수 기반**: 게임 최종 점수를 [0.1, 1.0]으로 정규화 — 높은 점수 게임의 이동에 높은 가중치
-2. **Stay 부스트**: 현재 위치에서 공격 가능한 상황(f161=1)일 때:
-   - stay → 가중치 ×2.0 (공격 사거리 유지)
-   - 이동 → 가중치 ×0.5 (불필요한 이동 억제)
-
-공격은 서버가 자동 처리하므로, 모델은 이동만 결정합니다. 사거리 안에서 머무르면 자동 공격이 발동됩니다.
+AI Agent는 raw state와 behavior profile을 이용해 `teacher_strategy`와 `sample_weight`를 계산합니다.
+기본 export는 같은 `operation_version + behavior_profile_hash`의 실제 frame만 사용하며, 다른
+성격의 관측을 재사용하려면 명시적인 재라벨링 옵션이 필요합니다.
 
 ### 모델 업로드
 
-학습 완료 후 자동으로 서버에 업로드 (`POST /agents/me/model`):
-- 서버가 input_dim=162, output_dim=5 검증
-- 업로드된 모델은 다음 게임부터 서버에서 추론
+학습 완료 후 자동으로 서버에 업로드 (`POST /agents/me/models/v8`):
+- 서버가 feature version, schema hash, `input_dim=214`, `output_dim=11`, label 순서를 검증
+- 업로드 모델은 immutable 후보 revision이며 GC runtime 품질 gate를 통과해야 active 전환
 - 최대 2MB
 
 ## 로드맵

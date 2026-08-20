@@ -3,6 +3,15 @@
 ClawClash(GC) 게임 참가 + 자율 학습 AI Agent 프레임워크.
 npm 패키지로 배포되며 pm2로 상시 실행한다.
 
+## 현재 기준 (2026-08)
+
+- 패키지 소스 버전: `2.4.1`
+- 신규 설치 기본 operation: `gc-v8-strategy-r2`
+- 모델 계약: feature `8.1`, schema `gc-strategy-v8-214-r1`, `214 → 11`
+- 실행 책임: 모델은 전략·대상을 선택하고 GC 서버가 BFS 이동과 공격을 실행
+- 서버 광고 계약: observe mode, accepted feature `8.0,8.1`; v7은 더 이상 광고하지 않음
+- v7 `153 → 5` 구현과 자료는 회귀 테스트·감사용 legacy이며 현재 operation으로 선택할 수 없음
+
 ---
 
 ## 기준 문서와 갱신 원칙
@@ -11,7 +20,7 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 
 | 영역 | 기준 문서 |
 |---|---|
-| 전체 구조와 장기 방향 | `overview/ARCHITECTURE.md`, `design/AI_AGENT_ADVANCEMENT_PLAN.md` |
+| 전체 구조와 장기 방향 | `overview/ARCHITECTURE.md`, `design/GC_AI_STRATEGY_V8_PLAN.md` |
 | AI Agent 실행 계획과 구현 상태 | `design/AI_AGENT_DEVELOPMENT_PLAN.md` |
 | GC/AI 계층형 전략 v8.1 공동 계약 | `design/GC_AI_STRATEGY_V8_PLAN.md` |
 | GC 서버 학습 데이터 계약 | `design/GC_TRAINING_DATA_INTEGRATION.md` |
@@ -44,18 +53,18 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 ### Design (설계)
 - [MODEL_UPLOAD.md](design/MODEL_UPLOAD.md) — ONNX 모델 업로드 설계
 - [TRAINING_PIPELINE.md](design/TRAINING_PIPELINE.md) — 자동 학습 파이프라인
-- [AI_AGENT_ADVANCEMENT_PLAN.md](design/AI_AGENT_ADVANCEMENT_PLAN.md) — 미로 대응, 학습 프로필, v8 데이터 계약 고도화 계획
 - [AI_AGENT_DEVELOPMENT_PLAN.md](design/AI_AGENT_DEVELOPMENT_PLAN.md) — 관리자 성격 Easy/Expert 모드, CLI, 학습·평가 실행 계획
 - [GC_AI_STRATEGY_V8_PLAN.md](design/GC_AI_STRATEGY_V8_PLAN.md) — 214차원/11전략, 공격 대상 선택과 GC 경로 실행 공동 계획
 - [GC_TRAINING_DATA_INTEGRATION.md](design/GC_TRAINING_DATA_INTEGRATION.md) — GC v8 training frame·cursor·모델 revision 연동 계약
 
 ### Requests (외부 협업 요청)
-- [REQUEST_GC_LOADOUT_PROFILE_CONTRACT.md](requests/REQUEST_GC_LOADOUT_PROFILE_CONTRACT.md) — 장비 선택 성격 식별자의 challenge/session 계약 보강 요청
 - [REQUEST_SAME_IP_MATCHING_BLOCK.md](requests/REQUEST_SAME_IP_MATCHING_BLOCK.md) — 매칭 정책 요청
-- [REQUEST_TICK_WEAPON.md](requests/REQUEST_TICK_WEAPON.md) — Tick state weapon 필드 추가 (완료)
 
 ### Archive (완료/폐기)
 - [PLAN_cancelled_game_fix.md](archive/PLAN_cancelled_game_fix.md) — 취소 게임 처리 (완료)
+- [COMPLETED_GC_LOADOUT_PROFILE_CONTRACT.md](archive/COMPLETED_GC_LOADOUT_PROFILE_CONTRACT.md) — 장비 성격 식별자 계약 (완료)
+- [COMPLETED_TICK_WEAPON.md](archive/COMPLETED_TICK_WEAPON.md) — legacy tick weapon 정보 보강 (완료)
+- [SUPERSEDED_AI_AGENT_ADVANCEMENT_PLAN.md](archive/SUPERSEDED_AI_AGENT_ADVANCEMENT_PLAN.md) — v8.1로 대체된 초기 고도화 계획
 
 ---
 

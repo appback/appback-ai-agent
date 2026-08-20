@@ -100,7 +100,11 @@ no_progress_rate:   0.000
 
 성격 차별성 기준 보고서: `reports/evaluation/personality-differentiation.json`
 
-## v8.1 Round 7 bootstrap 후보
+## 과거 절차: v8.1 Round 7 bootstrap 후보
+
+> 상태: 완료·archive 참고. 신규 설치는 패키지에 포함된 checksummed bootstrap을
+> `GcV81ModelBootstrapper`가 자동 확인·업로드하므로 아래 수동 생성 절차를 일반 운영에서
+> 반복하지 않는다.
 
 실제 v8.1 frame이 없는 최초 canary 수집용 모델은 deterministic synthetic raw state로만 생성한다.
 이 절차는 운영 데이터가 아니며 결과 metadata에 `observation_policy=synthetic_bootstrap`과 빈
@@ -129,5 +133,6 @@ root의 `profile-differentiation.json`은 같은 2,048개 관측에 대한 네 �
 pairwise disagreement를 기록한다. validator는 GC upload metadata의 필드 집합, checksum,
 evaluation digest, ONNX 214/11 shape 및 모든 offline gate를 fail-closed로 검사한다.
 
-이 후보는 격리 테스트 서버 canary만 허용한다. 운영 active, known-good, rollback 또는 strict
-전환에 사용하지 않으며, profile별 실게임 frame 수집 후 `same_profile_only` 후보로 교체한다.
+이 절차로 생성한 `synthetic_bootstrap` 후보는 canary 수집용 provenance를 유지하며 실제 frame
+기반 `same_profile_only` 모델로 위장하지 않는다. 현재 자동 rollout과 신규 설치 동작은
+`OPERATION_VERSION_GUIDE.md`를 따른다.
