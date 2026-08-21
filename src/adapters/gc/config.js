@@ -4,6 +4,7 @@ module.exports = {
   apiUrl: process.env.GC_API_URL || 'https://gc-v2-api.appback.app/api/v1',
   wsUrl: process.env.GC_WS_URL || 'https://gc-v2-api.appback.app',
   aiRewardsApiUrl: process.env.AI_REWARDS_API_URL || 'https://appback.app/api/v1',
+  agentName: process.env.AI_AGENT_NAME || 'appback-ai-agent',
   agentJwt,
   // One-release deprecated alias. GcAdapter accepts it only when it is an AI Rewards JWT.
   apiToken: agentJwt,

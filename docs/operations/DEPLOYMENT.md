@@ -29,21 +29,19 @@ npm 인증 정보는 `~/.npmrc`에 토큰으로 저장됨. 401/403 시 토큰 �
 ## Update All Agents
 
 JWT 전환 배포 전 각 인스턴스에서 `data/agent.db`, `models/`, `training/`, `.env`를
-백업하고 현재 `agent_identity.agent_id`를 기록한다. AI Rewards에서 그 UUID에 연결된
-기존 등록의 Auth Code를 준비하지 못한 에이전트는 자동 전환하지 않는다.
+백업하고 현재 `agent_identity.agent_id`를 기록한다. AI Rewards는 이 로컬 UUID 그대로
+JWT를 발급하며 AI Agent 인증에는 이메일·소유주·등록 코드를 사용하지 않는다.
 
 각 인스턴스의 안전한 순서는 다음과 같다.
 
 ```bash
 pm2 stop ai-agent
-# package update 후 기존 등록의 30분 Auth Code 사용
-appback-ai-agent register ARW-XXXX-XXXX
-appback-ai-agent doctor
 pm2 restart ai-agent
+appback-ai-agent doctor
 ```
 
-`register` 결과 UUID가 기존 SQLite UUID와 다르면 DB·모델을 복원하거나 지우지 말고
-AI Rewards 매핑을 수정한다. 등록 성공은 JWT만 교체하며 기존 UUID와 자산을 유지한다.
+기동 시 AI Rewards·SQLite·GC UUID가 다르면 DB·모델을 복원하거나 지우지 말고 중단한다.
+정상 전환은 JWT만 교체하며 기존 UUID와 자산을 유지한다.
 
 ### Standard (Ubuntu 글로벌 설치)
 
@@ -51,26 +49,23 @@ AI Rewards 매핑을 수정한다. 등록 성공은 JWT만 교체하며 기존 U
 # 로컬 머신 (.30)
 npm cache clean --force
 npm install -g appback-ai-agent@latest
-appback-ai-agent register ARW-XXXX-XXXX
-appback-ai-agent doctor
 pm2 restart ai-agent
+appback-ai-agent doctor
 
 # .20
 ssh au2222@192.168.0.20 "
   export PATH='/home/au2222/.nvm/versions/node/v22.22.0/bin:/usr/bin:/bin:\$PATH'
   npm cache clean --force
   npm install -g appback-ai-agent@latest
-  appback-ai-agent register ARW-XXXX-XXXX
-  appback-ai-agent doctor
   pm2 restart ai-agent
+  appback-ai-agent doctor
 "
 
 # DAONE-PC (직접 콘솔에서)
 npm cache clean --force
 npm install -g appback-ai-agent@latest
-appback-ai-agent register ARW-XXXX-XXXX
-appback-ai-agent doctor
 pm2 restart ai-agent
+appback-ai-agent doctor
 ```
 
 ### RHEL 8 / 로컬 디렉토리 (.26)
@@ -81,9 +76,8 @@ ssh ospadmin@192.168.0.26 '
   . "$NVM_DIR/nvm.sh"
   cd ~/ai-agent
   npm install appback-ai-agent@latest
-  npx appback-ai-agent register ARW-XXXX-XXXX
-  npx appback-ai-agent doctor
   pm2 restart ai-agent
+  npx appback-ai-agent doctor
 '
 ```
 
@@ -93,9 +87,8 @@ ssh ospadmin@192.168.0.26 '
 ```bash
 cd ~/projects/appback-ai-agent
 git pull
-appback-ai-agent register ARW-XXXX-XXXX
-appback-ai-agent doctor
 pm2 restart appback-ai-agent-dev
+appback-ai-agent doctor
 ```
 
 ### Runtime-only Docker workers
@@ -109,12 +102,9 @@ cd appback-ai-agent
 docker compose -f docker-compose.runtime.yml build
 ```
 
-최초 전환이나 JWT 재발급은 worker마다 기존 등록의 서로 다른 Auth Code를 적용한다.
+각 worker는 독립 volume의 UUID로 AI Rewards JWT를 자동 발급·갱신한다.
 
 ```bash
-docker compose -f docker-compose.runtime.yml run --rm hunter register ARW-XXXX-XXXX
-docker compose -f docker-compose.runtime.yml run --rm survivor register ARW-XXXX-XXXX
-docker compose -f docker-compose.runtime.yml run --rm navigator register ARW-XXXX-XXXX
 docker compose -f docker-compose.runtime.yml up -d
 ```
 

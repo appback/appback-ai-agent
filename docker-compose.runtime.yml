@@ -5,8 +5,8 @@ x-agent-common: &agent-common
     context: .
     dockerfile: Dockerfile.runtime
     args:
-      APPBACK_AI_AGENT_VERSION: ${APPBACK_AI_AGENT_VERSION:-2.5.0}
-  image: appback-ai-agent:${APPBACK_AI_AGENT_VERSION:-2.5.0}-runtime
+      APPBACK_AI_AGENT_VERSION: ${APPBACK_AI_AGENT_VERSION:-2.5.1}
+  image: appback-ai-agent:${APPBACK_AI_AGENT_VERSION:-2.5.1}-runtime
   restart: unless-stopped
   environment: &agent-environment
     AI_REWARDS_API_URL: ${AI_REWARDS_API_URL:-https://appback.app/api/v1}

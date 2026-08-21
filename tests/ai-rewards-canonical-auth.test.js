@@ -9,12 +9,11 @@ const Database = require('better-sqlite3')
 const { AiRewardsAgentAuthClient } = require('../src/auth/AiRewardsAgentAuthClient')
 const { validateAgentJwt } = require('../src/auth/agentJwt')
 const { redactSensitive, redactString } = require('../src/auth/redaction')
-const { registerCanonicalAgent } = require('../src/auth/registerCanonicalAgent')
+const { issueCanonicalAgent } = require('../src/auth/issueCanonicalAgent')
 const GcApiClient = require('../src/adapters/gc/GcApiClient')
 const GcAdapter = require('../src/adapters/gc/GcAdapter')
 const SqliteStore = require('../src/data/storage/SqliteStore')
 const AgentManager = require('../src/core/AgentManager')
-const { runRegisterCommand } = require('../bin/commands/register')
 
 const AGENT_ID = '11111111-1111-4111-8111-111111111111'
 const OTHER_AGENT_ID = '22222222-2222-4222-8222-222222222222'
@@ -55,37 +54,39 @@ function tempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))
 }
 
-test('AI Rewards exchange validates the canonical GC UUID/JWT response', async () => {
+test('AI Rewards issue requests a UUID/JWT without owner identity', async () => {
   const jwt = makeJwt()
+  let request = null
   const client = new AiRewardsAgentAuthClient({
-    client: { post: async () => ({ data: makeExchange(jwt) }) },
+    client: {
+      post: async (url, body) => {
+        request = { url, body }
+        return { data: makeExchange(jwt) }
+      },
+    },
   })
 
-  const result = await client.exchange({
-    registrationCode: 'ARW-1234-ABCD',
-    agentName: 'canonical-agent',
-  })
-
+  const result = await client.issue({ agentName: 'canonical-agent' })
   assert.equal(result.agentId, AGENT_ID)
-  assert.equal(result.service, 'gc')
-  assert.equal(result.agentToken, jwt)
-  assert.equal(validateAgentJwt(jwt).agentId, AGENT_ID)
+  assert.equal(request.url, '/ai/agent-auth/issue')
+  assert.deepEqual(request.body, { agent_name: 'canonical-agent', service: 'gc' })
+  assert.doesNotMatch(JSON.stringify(request.body), /owner|email|user/i)
 })
 
-test('AI Rewards exchange rejects another service and non-JWT credentials', async () => {
+test('AI Rewards issue rejects another service and non-JWT credentials', async () => {
   const wrongService = new AiRewardsAgentAuthClient({
     client: { post: async () => ({ data: makeExchange(makeJwt(), { service: 'tc' }) }) },
   })
   await assert.rejects(
-    wrongService.exchange({ registrationCode: 'ARW-1234-ABCD', agentName: 'agent' }),
-    error => error.code === 'INVALID_EXCHANGE_SERVICE'
+    wrongService.issue({ agentName: 'agent' }),
+    error => error.code === 'INVALID_ISSUE_SERVICE'
   )
 
   const legacyToken = new AiRewardsAgentAuthClient({
     client: { post: async () => ({ data: makeExchange('legacy-agent-token') }) },
   })
   await assert.rejects(
-    legacyToken.exchange({ registrationCode: 'ARW-1234-ABCD', agentName: 'agent' }),
+    legacyToken.issue({ agentName: 'agent' }),
     error => error.code === 'INVALID_AGENT_JWT'
   )
   assert.throws(() => validateAgentJwt('cr_agent_legacy-credential'), /not a valid JWT/)
@@ -172,55 +173,47 @@ test('canonical identity save is atomic and rejects every UUID mismatch', () => 
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
-test('registration flow saves only after AI Rewards and GC return the same UUID', async () => {
-  const dir = tempDir('agent-auth-register-')
+test('owner-free issue flow resumes the local UUID and persists only after GC agrees', async () => {
+  const dir = tempDir('agent-auth-issue-')
   const store = new SqliteStore(dir)
-  const jwt = makeJwt()
-  const authClient = { exchange: async () => ({
-    service: 'gc', agentId: AGENT_ID, agentName: 'canonical-agent', agentToken: jwt,
-    expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-  }) }
-  const gcClient = {
-    setToken(token) { assert.equal(token, jwt) },
-    register: async () => ({
-      agent_id: AGENT_ID,
-      name: 'canonical-agent',
-      identity_source: 'ai_rewards_jwt',
-    }),
-  }
-
-  await registerCanonicalAgent({
-    registrationCode: 'ARW-1234-ABCD',
-    agentName: 'canonical-agent',
-    authClient,
-    gcClient,
-    store,
+  const legacyJwt = makeJwt()
+  store.saveCanonicalIdentity({
+    game: 'claw-clash', agentId: AGENT_ID, gcAgentId: AGENT_ID,
+    agentToken: legacyJwt, name: 'canonical-agent',
   })
-  assert.equal(store.getIdentity('claw-clash').agent_id, AGENT_ID)
-
-  const mismatchedStore = new SqliteStore(tempDir('agent-auth-register-mismatch-'))
-  await assert.rejects(registerCanonicalAgent({
-    registrationCode: 'ARW-5678-EF01',
+  const renewedJwt = makeJwt(AGENT_ID, { claims: { jti: 'renewed-jti' } })
+  let issueInput = null
+  const result = await issueCanonicalAgent({
     agentName: 'canonical-agent',
-    authClient,
+    authClient: {
+      issue: async input => {
+        issueInput = input
+        return {
+          service: 'gc', agentId: AGENT_ID, agentName: 'canonical-agent',
+          agentToken: renewedJwt, expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        }
+      },
+    },
     gcClient: {
-      setToken() {},
+      setToken: token => assert.equal(token, renewedJwt),
       register: async () => ({
-        agent_id: OTHER_AGENT_ID,
-        name: 'other-agent',
-        identity_source: 'ai_rewards_jwt',
+        agent_id: AGENT_ID, name: 'canonical-agent', identity_source: 'ai_rewards_jwt',
       }),
     },
-    store: mismatchedStore,
-  }), error => error.code === 'GC_AGENT_ID_MISMATCH')
-  assert.equal(mismatchedStore.getIdentity('claw-clash'), undefined)
-
+    store,
+  })
+  assert.deepEqual(issueInput, {
+    agentId: AGENT_ID,
+    agentName: 'canonical-agent',
+    agentToken: legacyJwt,
+  })
+  assert.equal(result.agentId, AGENT_ID)
+  assert.equal(store.getIdentity('claw-clash').api_token, renewedJwt)
   store.close()
-  mismatchedStore.close()
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
-test('mock AI Rewards and GC integration exchanges, registers, and persists one identity', async t => {
+test('mock AI Rewards and GC integration issues, registers, and persists one identity', async t => {
   const jwt = makeJwt()
   const seen = []
   const rewardsServer = http.createServer((req, res) => {
@@ -255,15 +248,14 @@ test('mock AI Rewards and GC integration exchanges, registers, and persists one 
   const authClient = new AiRewardsAgentAuthClient({ apiUrl: rewardsUrl })
   const gcClient = new GcApiClient({ apiUrl: gcUrl })
 
-  await registerCanonicalAgent({
-    registrationCode: 'ARW-1234-ABCD',
+  await issueCanonicalAgent({
     agentName: 'canonical-agent',
     authClient,
     gcClient,
     store,
   })
 
-  assert.equal(seen[0].path, '/ai/agent-auth/exchange')
+  assert.equal(seen[0].path, '/ai/agent-auth/issue')
   assert.equal(seen[1].path, '/agents/register')
   assert.equal(seen[1].authorization, `Bearer ${jwt}`)
   assert.equal(store.getIdentity('claw-clash').agent_id, AGENT_ID)
@@ -293,29 +285,6 @@ test('GC auth rejection revokes the client session until a new JWT is set', asyn
   assert.equal(client.client.defaults.headers.common.Authorization, undefined)
 })
 
-test('register CLI output never includes a registration code or JWT on failure', async () => {
-  const jwt = makeJwt()
-  const lines = []
-  const store = { getIdentity: () => null }
-  const code = await runRegisterCommand({
-    registrationCode: 'ARW-1234-ABCD',
-    cwd: process.cwd(),
-    output: { log: line => lines.push(line), error: line => lines.push(line) },
-    dependencies: {
-      store,
-      config: { aiRewardsApiUrl: 'https://rewards.invalid', apiUrl: 'https://gc.invalid' },
-      authClient: {},
-      gcClient: {},
-      registerCanonicalAgent: async () => {
-        throw new Error(`failed ARW-1234-ABCD Bearer ${jwt}`)
-      },
-    },
-  })
-
-  assert.equal(code, 1)
-  assert.doesNotMatch(lines.join('\n'), /ARW-1234-ABCD|test-signature/)
-})
-
 function adapterWith(options = {}) {
   const store = options.store || {
     getIdentity: () => options.saved || null,
@@ -326,23 +295,57 @@ function adapterWith(options = {}) {
     runtimeContext: { feature_version: '8.1', operation_version: 'gc-v8-strategy-r2' },
     dataCollector: { store },
     eventBus: { emit() {} },
-    agentVersion: '2.5.0',
+    agentVersion: '2.5.1',
+    authClient: options.authClient || {
+      issue: async ({ agentId }) => {
+        const issuedId = agentId || AGENT_ID
+        return {
+          service: 'gc', agentId: issuedId, agentName: options.saved?.name || 'canonical-agent',
+          agentToken: makeJwt(issuedId), expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        }
+      },
+    },
   })
   adapter._checkServerContract = async () => {}
   return adapter
 }
 
-test('runtime fails closed without a JWT and on stored UUID mismatch', async () => {
+test('runtime obtains a UUID when absent and preserves a legacy local UUID', async () => {
   const missing = adapterWith()
-  await assert.rejects(missing.initialize(), /register <ARW-code>/)
-  assert.equal(missing.authState, GcAdapter.AUTH_STATES.CODE_REQUIRED)
+  missing.api = {
+    setToken() {},
+    register: async () => ({
+      agent_id: AGENT_ID, name: 'canonical-agent', identity_source: 'ai_rewards_jwt',
+    }),
+    getEquipment: async () => { throw new Error('not needed') },
+  }
+  await missing.initialize()
+  assert.equal(missing.authState, GcAdapter.AUTH_STATES.ACTIVE)
+  assert.equal(missing.agentId, AGENT_ID)
 
-  const mismatch = adapterWith({
-    token: makeJwt(OTHER_AGENT_ID),
-    saved: { agent_id: AGENT_ID, api_token: makeJwt(), name: 'existing' },
+  let resumedId = null
+  const legacy = adapterWith({
+    token: 'cr_agent_legacy-credential',
+    saved: { agent_id: AGENT_ID, api_token: 'cr_agent_legacy-credential', name: 'existing' },
+    authClient: {
+      issue: async ({ agentId, agentToken }) => {
+        resumedId = agentId
+        assert.equal(agentToken, 'cr_agent_legacy-credential')
+        return {
+          service: 'gc', agentId, agentName: 'existing', agentToken: makeJwt(agentId),
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        }
+      },
+    },
   })
-  await assert.rejects(mismatch.initialize(), /AGENT_IDENTITY_MISMATCH/)
-  assert.equal(mismatch.authState, GcAdapter.AUTH_STATES.REAUTH_REQUIRED)
+  legacy.api = {
+    setToken() {},
+    register: async () => ({ agent_id: AGENT_ID, name: 'existing', identity_source: 'ai_rewards_jwt' }),
+    getEquipment: async () => { throw new Error('not needed') },
+  }
+  await legacy.initialize()
+  assert.equal(resumedId, AGENT_ID)
+  assert.equal(legacy.authState, GcAdapter.AUTH_STATES.ACTIVE)
 })
 
 test('runtime accepts the same canonical UUID and persists credential metadata', async () => {
@@ -369,25 +372,33 @@ test('runtime accepts the same canonical UUID and persists credential metadata',
   assert.equal(saved.gcAgentId, AGENT_ID)
 })
 
-test('expired JWT transitions to REAUTH_REQUIRED and never reaches GC', async () => {
+test('expired JWT is reissued automatically for the same local UUID', async () => {
   const expired = makeJwt(AGENT_ID, { exp: Math.floor(Date.now() / 1000) - 5 })
   const adapter = adapterWith({
     token: expired,
     saved: { agent_id: AGENT_ID, api_token: expired, name: 'canonical-agent' },
   })
-  let called = false
-  adapter.api = { setToken() { called = true } }
+  let registered = false
+  adapter.api = {
+    setToken() {},
+    register: async () => {
+      registered = true
+      return { agent_id: AGENT_ID, name: 'canonical-agent', identity_source: 'ai_rewards_jwt' }
+    },
+    getEquipment: async () => { throw new Error('not needed') },
+  }
 
-  await assert.rejects(adapter.initialize(), /AGENT_JWT_EXPIRED/)
-  assert.equal(adapter.authState, GcAdapter.AUTH_STATES.REAUTH_REQUIRED)
-  assert.equal(called, false)
+  await adapter.initialize()
+  assert.equal(adapter.authState, GcAdapter.AUTH_STATES.ACTIVE)
+  assert.equal(adapter.agentId, AGENT_ID)
+  assert.equal(registered, true)
 })
 
 test('manager propagates a fail-closed adapter initialization error', async () => {
   const manager = new AgentManager({ discoveryIntervalSec: 30 })
   manager.registerAdapter({
     gameName: 'claw-clash',
-    initialize: async () => { throw new Error('CODE_REQUIRED') },
+    initialize: async () => { throw new Error('AUTH_BOOTSTRAP_FAILED') },
   })
-  await assert.rejects(manager.start(), /CODE_REQUIRED/)
+  await assert.rejects(manager.start(), /AUTH_BOOTSTRAP_FAILED/)
 })

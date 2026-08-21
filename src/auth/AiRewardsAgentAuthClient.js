@@ -2,7 +2,6 @@ const axios = require('axios')
 const { isUuid, validateAgentJwt } = require('./agentJwt')
 
 const DEFAULT_API_URL = 'https://appback.app/api/v1'
-const CODE_PATTERN = /^ARW-[A-Z0-9]{4}-[A-Z0-9]{4}$/i
 
 class AiRewardsAgentAuthError extends Error {
   constructor(code, message, status = null) {
@@ -22,9 +21,9 @@ class AiRewardsAgentAuthClient {
     })
   }
 
-  async exchange({ registrationCode, agentName }) {
-    if (!CODE_PATTERN.test(String(registrationCode || ''))) {
-      throw new AiRewardsAgentAuthError('INVALID_REGISTRATION_CODE', 'AI Rewards registration code format is invalid')
+  async issue({ agentId = null, agentName, agentToken = null }) {
+    if (agentId && !isUuid(agentId)) {
+      throw new AiRewardsAgentAuthError('INVALID_AGENT_ID', 'Existing agent ID must be a UUID')
     }
     if (typeof agentName !== 'string' || agentName.trim().length === 0 || agentName.length > 120) {
       throw new AiRewardsAgentAuthError('INVALID_AGENT_NAME', 'Agent name is required and must be at most 120 characters')
@@ -32,49 +31,51 @@ class AiRewardsAgentAuthClient {
 
     let data
     try {
-      const response = await this.client.post('/ai/agent-auth/exchange', {
-        registration_code: registrationCode,
+      const payload = {
         agent_name: agentName.trim(),
-      })
+        service: 'gc',
+      }
+      if (agentId) {
+        payload.agent_id = agentId
+        payload.agent_token = agentToken
+      }
+      const response = await this.client.post('/ai/agent-auth/issue', payload)
       data = response.data
     } catch (error) {
       const status = Number(error.response?.status) || null
-      const code = status === 400 || status === 404 || status === 409
-        ? 'REGISTRATION_CODE_REJECTED'
-        : status === 429
-          ? 'REGISTRATION_RATE_LIMITED'
-          : 'AI_REWARDS_EXCHANGE_FAILED'
-      throw new AiRewardsAgentAuthError(code, `AI Rewards code exchange failed${status ? ` (${status})` : ''}`, status)
+      const code = status === 429 ? 'AGENT_ISSUE_RATE_LIMITED' : 'AI_REWARDS_AGENT_ISSUE_FAILED'
+      throw new AiRewardsAgentAuthError(code, `AI Rewards agent credential issue failed${status ? ` (${status})` : ''}`, status)
     }
 
-    return validateExchangeResponse(data)
+    return validateIssueResponse(data)
   }
+
 }
 
-function validateExchangeResponse(data) {
+function validateIssueResponse(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new AiRewardsAgentAuthError('INVALID_EXCHANGE_RESPONSE', 'AI Rewards returned an invalid exchange response')
+    throw new AiRewardsAgentAuthError('INVALID_ISSUE_RESPONSE', 'AI Rewards returned an invalid issue response')
   }
   if (data.status !== 'ok' || data.service !== 'gc') {
-    throw new AiRewardsAgentAuthError('INVALID_EXCHANGE_SERVICE', 'AI Rewards exchange response is not for GC')
+    throw new AiRewardsAgentAuthError('INVALID_ISSUE_SERVICE', 'AI Rewards issue response is not for GC')
   }
   if (!isUuid(data.agent_id)) {
-    throw new AiRewardsAgentAuthError('INVALID_EXCHANGE_AGENT_ID', 'AI Rewards exchange response has an invalid agent UUID')
+    throw new AiRewardsAgentAuthError('INVALID_ISSUE_AGENT_ID', 'AI Rewards issue response has an invalid agent UUID')
   }
   if (data.token_type !== 'Bearer') {
-    throw new AiRewardsAgentAuthError('INVALID_EXCHANGE_TOKEN_TYPE', 'AI Rewards exchange response has an invalid token type')
+    throw new AiRewardsAgentAuthError('INVALID_ISSUE_TOKEN_TYPE', 'AI Rewards issue response has an invalid token type')
   }
 
   let jwt
   try {
     jwt = validateAgentJwt(data.agent_token, { expectedAgentId: data.agent_id })
   } catch (error) {
-    throw new AiRewardsAgentAuthError(error.code || 'INVALID_EXCHANGE_JWT', error.message)
+    throw new AiRewardsAgentAuthError(error.code || 'INVALID_ISSUE_JWT', error.message)
   }
 
   const expiresAt = new Date(data.expires_at)
   if (!data.expires_at || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
-    throw new AiRewardsAgentAuthError('INVALID_EXCHANGE_EXPIRY', 'AI Rewards exchange response has an invalid expiry')
+    throw new AiRewardsAgentAuthError('INVALID_ISSUE_EXPIRY', 'AI Rewards issue response has an invalid expiry')
   }
 
   return Object.freeze({
@@ -91,5 +92,5 @@ function validateExchangeResponse(data) {
 module.exports = {
   AiRewardsAgentAuthClient,
   AiRewardsAgentAuthError,
-  validateExchangeResponse,
+  validateIssueResponse,
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.5.1] - 2026-08-21
+
+### Autonomous AI Rewards identity
+
+- Remove registration-code and owner-account dependencies from AI Agent authentication
+- Ask AI Rewards to allocate a UUID when local identity is absent
+- Reissue a GC-scoped JWT directly for an existing local UUID
+- Automatically migrate legacy GC credentials and renew expired JWTs
+- Fail closed when an agent credential is revoked or does not match the local UUID
+- Keep account association outside the AI Agent runtime authentication path
+
 ## [2.5.0] - 2026-08-21
 
 ### AI Rewards canonical identity

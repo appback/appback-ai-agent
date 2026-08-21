@@ -11,27 +11,18 @@
 ```bash
 mkdir my-agent && cd my-agent
 npx appback-ai-agent init
-npx appback-ai-agent register ARW-XXXX-XXXX
 npx appback-ai-agent start
 ```
 
-등록 코드는 [AI Rewards](https://rewards.appback.app)의 `My AI Agents`에서 발급한다.
-AI Rewards가 canonical UUID와 서명 JWT를 발급하고, CLI는 그 JWT로 GC에 같은 UUID를
-등록한 뒤에만 SQLite에 identity를 저장한다. 코드 교환 전에는 에이전트가 시작되지 않는다.
+AI Rewards가 canonical UUID와 서명 JWT를 직접 발급한다. 로컬 UUID가 없으면 새 UUID를
+받고, 기존 UUID가 있으면 같은 UUID로 JWT를 발급·갱신한 뒤 GC에 입장한다. AI Agent는
+이메일, 소유주 또는 계정 credential을 사용하거나 저장하지 않는다.
 
-## AI Rewards 연결
+## AI Rewards identity
 
-AI Rewards는 계정 연결뿐 아니라 에이전트 UUID와 GC 인증 JWT의 발급 주체다.
-
-```bash
-# 신규 에이전트: Register Agent 코드
-# 기존 에이전트: 기존 등록의 Auth Code (UUID·Face·모델·전적 보존)
-npx appback-ai-agent register ARW-XXXX-XXXX
-```
-
-기존 로컬 UUID와 Auth Code 교환 UUID가 다르면 저장과 GC 참가를 중단한다. 새 UUID로
-자동 덮어쓰거나 Face·모델·학습 데이터를 초기화하지 않는다. JWT가 만료·폐기되면 기존
-등록에서 Auth Code를 다시 발급해 같은 명령을 실행한다.
+AI Rewards는 에이전트 UUID와 GC 인증 JWT의 발급 주체다. `start`가 identity bootstrap과
+JWT 갱신을 자동 처리한다. 기존 로컬 UUID는 그대로 유지되며 AI Rewards·GC 응답 UUID가
+다르면 저장과 참가를 중단한다. Face·모델·학습 데이터는 초기화하지 않는다.
 
 ## 백그라운드 실행
 
@@ -44,7 +35,6 @@ nohup npx appback-ai-agent start > agent.log 2>&1 &
 # pm2 (권장 — 자동 재시작, 로그 관리)
 npm install -g pm2
 npx appback-ai-agent init
-npx appback-ai-agent register ARW-XXXX-XXXX
 pm2 start "npx appback-ai-agent start" --name ai-agent
 pm2 logs ai-agent   # 로그 확인
 pm2 stop ai-agent   # 중지
@@ -57,7 +47,6 @@ npm install -g appback-ai-agent
 
 mkdir my-agent && cd my-agent
 appback-ai-agent init
-appback-ai-agent register ARW-XXXX-XXXX
 appback-ai-agent start
 ```
 
@@ -70,10 +59,9 @@ cp .env.example .env
 docker compose build
 ```
 
-최초 등록은 data volume에 canonical identity를 저장한 뒤 서비스를 기동한다.
+최초 기동 시 data volume에 AI Rewards canonical identity가 자동 저장된다.
 
 ```bash
-docker compose run --rm agent node bin/cli.js register ARW-XXXX-XXXX
 docker compose up --build -d
 ```
 
@@ -84,12 +72,9 @@ docker compose up --build -d
 docker compose -f docker-compose.runtime.yml build
 ```
 
-각 worker는 서로 다른 기존 등록 Auth Code 또는 신규 등록 코드를 사용한다.
+각 worker의 독립 data volume이 별도 UUID/JWT를 자동 보관한다.
 
 ```bash
-docker compose -f docker-compose.runtime.yml run --rm hunter register ARW-XXXX-XXXX
-docker compose -f docker-compose.runtime.yml run --rm survivor register ARW-XXXX-XXXX
-docker compose -f docker-compose.runtime.yml run --rm navigator register ARW-XXXX-XXXX
 docker compose -f docker-compose.runtime.yml up -d
 ```
 
@@ -105,7 +90,6 @@ docker compose -f docker-compose.runtime.yml up -d
 npx appback-ai-agent doctor                # 환경 점검 (시스템/프로젝트/학습 스펙)
 npx appback-ai-agent init                  # .env + 디렉토리 생성
 npx appback-ai-agent start                 # 에이전트 실행 (기본)
-npx appback-ai-agent register <code>       # 코드 교환 → JWT 발급 → canonical GC 등록
 npx appback-ai-agent export                # SQLite → 학습 데이터 추출
 npx appback-ai-agent train                 # 수동 모델 학습
 npx appback-ai-agent evaluate maze         # 고정 미로 오프라인 품질 평가
@@ -168,7 +152,7 @@ echo 'PYTHON_PATH=.venv/bin/python3' >> .env
 
 `appback-ai-agent init` 실행 시 생성되는 `.env` 파일:
 
-- `AI_REWARDS_API_URL` — UUID/JWT 코드 교환 API (기본: `https://appback.app/api/v1`)
+- `AI_REWARDS_API_URL` — UUID/JWT 발급 API (기본: `https://appback.app/api/v1`)
 - `AI_REWARDS_AGENT_JWT` — 선택적 JWT 환경변수 override; 기본은 SQLite 저장값 사용
 - `GC_API_URL` — canonical GC API (기본: `https://gc-v2-api.appback.app/api/v1`)
 - `GC_WS_URL` — WebSocket URL (기본: `https://gc-v2-api.appback.app`)
@@ -195,7 +179,7 @@ echo 'PYTHON_PATH=.venv/bin/python3' >> .env
 ## 아키텍처
 
 ```
-AI Rewards code exchange → canonical UUID + JWT
+AI Rewards UUID/JWT issue → canonical UUID + JWT
                               │
                               v
 AgentManager → GcAdapter → JWT-authenticated GC REST discovery/challenge

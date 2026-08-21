@@ -6,6 +6,8 @@ const GcFeatureBuilder = require('./GcFeatureBuilder')
 const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
 const { validateAgentJwt } = require('../../auth/agentJwt')
+const { AiRewardsAgentAuthClient } = require('../../auth/AiRewardsAgentAuthClient')
+const { issueCanonicalAgent } = require('../../auth/issueCanonicalAgent')
 const { INACTIVE_STATES } = require('./constants')
 const {
   FLEE_TWO_STEP_CAPABILITY,
@@ -20,8 +22,7 @@ const log = createLogger('gc-adapter')
 
 const AUTH_STATES = Object.freeze({
   UNBOUND: 'UNBOUND',
-  CODE_REQUIRED: 'CODE_REQUIRED',
-  EXCHANGING: 'EXCHANGING',
+  ISSUING: 'ISSUING',
   GC_REGISTERING: 'GC_REGISTERING',
   ACTIVE: 'ACTIVE',
   REAUTH_REQUIRED: 'REAUTH_REQUIRED',
@@ -41,10 +42,13 @@ class GcAdapter extends BaseGameAdapter {
       this.runtimeContext.operation_version
     )
     this.api = new GcApiClient(this.config, this.clientContract)
+    this.authClient = opts.authClient || new AiRewardsAgentAuthClient({
+      apiUrl: this.config.aiRewardsApiUrl,
+    })
     this.api.onAuthFailure(code => {
       this.authState = AUTH_STATES.REAUTH_REQUIRED
       this._stopQueuePolling()
-      log.error(`${code}: AI Rewards Auth Code reauthentication required`)
+      log.error(`${code}: AI Rewards credential reissue required`)
     })
     this.ws = new GcSocketClient(this.config)
     this.strategyEngine = new GcStrategyEngine()
@@ -120,22 +124,24 @@ class GcAdapter extends BaseGameAdapter {
   async _initializeCanonicalIdentity() {
     const store = this.dataCollector?.store || null
     const saved = store?.getIdentity(this.gameName) || null
-    const token = this.config.agentJwt || this.config.apiToken || saved?.api_token || ''
-
-    if (!token) {
-      this.authState = AUTH_STATES.CODE_REQUIRED
-      throw new Error(
-        'AI Rewards agent code required. Run: appback-ai-agent register <ARW-code>'
-      )
-    }
+    const savedCanonicalToken = saved?.credential_type === 'agent_jwt' ? saved.api_token : ''
+    const token = this.config.credentialSource === 'AI_REWARDS_AGENT_JWT'
+      ? this.config.agentJwt
+      : savedCanonicalToken || this.config.agentJwt || this.config.apiToken || saved?.api_token || ''
 
     let credential
-    try {
-      credential = validateAgentJwt(token, { expectedAgentId: saved?.agent_id || undefined })
-      this.api.setToken(token)
-    } catch (error) {
-      this.authState = AUTH_STATES.REAUTH_REQUIRED
-      throw new Error(`${error.code || 'INVALID_AI_REWARDS_AGENT'}: ${error.message}`)
+    if (token) {
+      try {
+        credential = validateAgentJwt(token, { expectedAgentId: saved?.agent_id || undefined })
+        this.api.setToken(token)
+      } catch (error) {
+        log.warn(`${error.code || 'INVALID_AI_REWARDS_AGENT'}: requesting a replacement AI Rewards JWT`)
+      }
+    }
+
+    if (!credential) {
+      await this._issueCanonicalIdentity(store, saved)
+      return
     }
 
     this.apiToken = token
@@ -158,7 +164,7 @@ class GcAdapter extends BaseGameAdapter {
         code === 'INVALID_AI_REWARDS_AGENT'
       ) {
         this.authState = AUTH_STATES.REAUTH_REQUIRED
-        throw new Error(`${code || 'INVALID_AI_REWARDS_AGENT'}: issue an Auth Code and register again`)
+        throw new Error(`${code || 'INVALID_AI_REWARDS_AGENT'}: automatic AI Rewards JWT renewal failed`)
       } else {
         throw new Error(`GC agent authentication check failed: ${error.message}`)
       }
@@ -189,6 +195,23 @@ class GcAdapter extends BaseGameAdapter {
     this.agentId = credential.agentId
     this.authState = AUTH_STATES.ACTIVE
     log.info(`Canonical agent active: ${identity.name || 'unnamed'} (${this.agentId})`)
+  }
+
+  async _issueCanonicalIdentity(store = this.dataCollector?.store, saved = null) {
+    if (!store) throw new Error('AI Rewards identity storage is unavailable')
+    const localIdentity = saved || store.getIdentity(this.gameName) || null
+    this.authState = AUTH_STATES.ISSUING
+    const issued = await issueCanonicalAgent({
+      agentName: localIdentity?.name || this.config.agentName || 'appback-ai-agent',
+      authClient: this.authClient,
+      gcClient: this.api,
+      store,
+      game: this.gameName,
+    })
+    this.apiToken = issued.agentToken
+    this.agentId = issued.agentId
+    this.authState = AUTH_STATES.ACTIVE
+    log.info(`Canonical agent active: ${issued.agentName || 'unnamed'} (${issued.agentId})`)
   }
 
   async _checkServerContract() {
@@ -267,6 +290,14 @@ class GcAdapter extends BaseGameAdapter {
   }
 
   async discoverGames() {
+    if (this.authState === AUTH_STATES.REAUTH_REQUIRED) {
+      try {
+        await this._issueCanonicalIdentity()
+      } catch (error) {
+        log.error(`AI Rewards credential reissue failed: ${error.message}`)
+        return { status: 'reauth_required' }
+      }
+    }
     if (this.authState !== AUTH_STATES.ACTIVE) {
       return { status: this.authState === AUTH_STATES.REAUTH_REQUIRED ? 'reauth_required' : 'auth_required' }
     }

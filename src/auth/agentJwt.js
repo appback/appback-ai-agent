@@ -63,7 +63,7 @@ function validateAgentJwt(token, options = {}) {
     throw new AgentJwtError('INVALID_AGENT_JWT_EXPIRY', 'AI Rewards agent JWT expiry is invalid')
   }
   if (!options.allowExpired && payload.exp <= nowSeconds) {
-    throw new AgentJwtError('AGENT_JWT_EXPIRED', 'AI Rewards agent JWT has expired; issue an Auth Code and register again')
+    throw new AgentJwtError('AGENT_JWT_EXPIRED', 'AI Rewards agent JWT has expired and must be reissued')
   }
   if (options.expectedAgentId && payload.sub !== options.expectedAgentId) {
     throw new AgentJwtError(

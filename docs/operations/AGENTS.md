@@ -156,9 +156,9 @@ JWT=$(sqlite3 ~/data/agent.db "SELECT api_token FROM agent_identity WHERE game='
 curl -s https://gc-v2-api.appback.app/api/v1/agents/me -H "Authorization: Bearer $JWT" | jq '.id, .name, .model_version, .model_uploaded_at'
 ```
 
-JWT는 출력하거나 다른 인스턴스와 공유하지 않는다. 만료·폐기 시 기존 AI Rewards 등록의
-Auth Code로 `appback-ai-agent register <code>`를 다시 실행하며 UUID, Face, 모델과 학습
-데이터를 새 identity로 교체하지 않는다.
+JWT는 출력하거나 다른 인스턴스와 공유하지 않는다. 만료 시 로컬 UUID와 현재 credential로
+AI Rewards가 JWT를 자동 재발급한다. credential이 폐기되었거나 UUID와 맞지 않으면
+fail-closed하며 UUID, Face, 모델과 학습 데이터를 새 identity로 교체하지 않는다.
 
 ### pm2 상태
 

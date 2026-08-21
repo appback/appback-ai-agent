@@ -110,12 +110,12 @@ if (CMD === 'doctor') {
     const rawDataDir = process.env.DATA_DIR || 'data'
     const dataDir = path.isAbsolute(rawDataDir) ? rawDataDir : path.resolve(CWD, rawDataDir)
     const dbPath = path.join(dataDir, 'agent.db')
-    if (!fs.existsSync(dbPath)) throw new Error('no database — run: appback-ai-agent register <ARW-code>')
+    if (!fs.existsSync(dbPath)) throw new Error('no database — run: appback-ai-agent start')
     const SqliteStore = require(path.join(PKG_ROOT, 'src', 'data', 'storage', 'SqliteStore'))
     const store = new SqliteStore(dataDir)
     doctorIdentity = store.getIdentity('claw-clash')
     store.close()
-    if (!doctorIdentity) throw new Error('not registered — run: appback-ai-agent register <ARW-code>')
+    if (!doctorIdentity) throw new Error('identity not allocated — run: appback-ai-agent start')
     return `${doctorIdentity.name} (${doctorIdentity.agent_id})`
   })
   check('Agent credential', () => {
@@ -123,7 +123,7 @@ if (CMD === 'doctor') {
     const { validateAgentJwt } = require(path.join(PKG_ROOT, 'src', 'auth', 'agentJwt'))
     const jwt = validateAgentJwt(doctorIdentity.api_token, { expectedAgentId: doctorIdentity.agent_id })
     if (doctorIdentity.credential_issuer !== 'ai-rewards' || doctorIdentity.credential_type !== 'agent_jwt') {
-      throw new Error('credential metadata is not canonical; register with an AI Rewards Auth Code')
+      throw new Error('credential metadata is not canonical; start the agent to reissue it')
     }
     return `AI Rewards JWT, expires ${jwt.expiresAt}`
   })
@@ -235,28 +235,8 @@ if (CMD === 'init') {
   const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
   const operation = new OperationVersionStore(path.join(CWD, 'config')).ensureActive()
   console.log(`Operation contract initialized: ${operation.operation_version}`)
-  console.log('\nReady! Run: npx appback-ai-agent register ARW-XXXX-XXXX, then start')
+  console.log('\nReady! Run: npx appback-ai-agent start')
   process.exit(0)
-}
-
-// ── register: AI Rewards 등록 코드로 Hub 계정에 에이전트 연결 ──
-if (CMD === 'register') {
-  const code = process.argv[3]
-  if (!code) {
-    console.error('Usage: npx appback-ai-agent register <registration_code>')
-    console.error('  Get your code at https://rewards.appback.app → My AI Agents → Register Agent')
-    process.exit(1)
-  }
-
-  const envPath = path.join(CWD, '.env')
-  if (fs.existsSync(envPath)) {
-    require('dotenv').config({ path: envPath })
-  } else {
-    require('dotenv').config()
-  }
-  const { runRegisterCommand } = require('./commands/register')
-  runRegisterCommand({ registrationCode: code, cwd: CWD }).then(code => process.exit(code))
-  return
 }
 
 // ── export: 학습 데이터 재추출 ──
@@ -377,7 +357,6 @@ Usage:
   npx appback-ai-agent doctor                 Check environment & dependencies
   npx appback-ai-agent init                  Create .env and directories
   npx appback-ai-agent start                 Start the agent (default)
-  npx appback-ai-agent register <code>       Exchange AI Rewards code and register canonical GC identity
   npx appback-ai-agent export [--reuse-observations]
                                              Export profile-isolated training data
   npx appback-ai-agent train                 Run model training manually
@@ -389,7 +368,6 @@ Usage:
 
 Quick start:
   npx appback-ai-agent init
-  npx appback-ai-agent register ARW-XXXX-XXXX
   npx appback-ai-agent start
 
 Training (requires Python):
@@ -418,9 +396,8 @@ Operation versioning:
   npx appback-ai-agent operation activate v8 --yes
   npx appback-ai-agent operation activate v81 --yes  # v8.1 test agents only
 
-AI Rewards registration:
-  1. Go to https://rewards.appback.app → My AI Agents → Register Agent/Auth Code
-  2. Copy the one-time code (ARW-XXXX-XXXX)
-  3. npx appback-ai-agent register ARW-XXXX-XXXX
-  4. Start only after canonical UUID/JWT registration succeeds
+AI Rewards identity:
+  - start requests a UUID from AI Rewards when none exists
+  - an existing local UUID is reused when AI Rewards issues or renews its JWT
+  - no email, owner, or account credential is used by the AI Agent runtime
 `)

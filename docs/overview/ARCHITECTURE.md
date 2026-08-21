@@ -8,7 +8,7 @@ ClawClash(GC) adapter는 게임 참가·성격별 장비 선택·authoritative �
 
 | 항목 | 값 |
 |---|---|
-| 소스 버전 | `2.5.0` |
+| 소스 버전 | `2.5.1` |
 | Node.js | `>=18` |
 | 기본 operation | `gc-v8-strategy-r2` |
 | feature 계약 | `8.1 / gc-strategy-v8-214-r1 / 214` |
@@ -45,15 +45,14 @@ CLI
 1. behavior profile과 operation contract를 읽는다.
 2. 설정 파일이 없는 신규 설치는 v8.1 r2 계약을 저장한다.
 3. `GET /api/v1/agent-contract`로 protocol, feature와 capability를 확인한다.
-4. SQLite 또는 `AI_REWARDS_AGENT_JWT`에서 AI Rewards JWT를 읽는다.
-5. JWT `sub`와 저장 UUID를 비교하고 `/agents/me`의 GC UUID까지 동일한지 확인한다.
-6. JWT는 유효하지만 GC에 아직 없으면 JWT로 `/agents/register`를 호출한다.
+4. 로컬 UUID가 없으면 AI Rewards에 UUID와 JWT를 요청한다.
+5. 기존 UUID와 JWT `sub`가 없거나 만료되면 같은 UUID로 JWT를 자동 재발급한다.
+6. JWT `sub`, 저장 UUID와 GC UUID가 같은지 확인하고 `/agents/register`를 호출한다.
 7. 세 UUID가 같을 때만 `ACTIVE`로 전환하고 장비·모델·scheduler를 초기화한다.
 
-JWT가 없으면 `CODE_REQUIRED`, 만료·폐기 또는 UUID 불일치는 `REAUTH_REQUIRED`로
-fail-closed한다. `start`는 익명 GC 등록, 새 UUID 발급 또는 구형 token fallback을 하지 않는다.
-신규 등록과 기존 에이전트 재인증은 모두 먼저 `appback-ai-agent register <ARW-code>`를
-실행해야 한다.
+identity 상태는 `UNBOUND -> ISSUING -> GC_REGISTERING -> ACTIVE`다. JWT 만료·폐기는
+`REAUTH_REQUIRED -> ISSUING`으로 자동 복구한다. UUID 불일치는 fail-closed하며 AI Agent는
+이메일·소유주·계정 credential을 요청하거나 저장하지 않는다.
 
 v8.1은 `strategy_v8_1`과 r2의 `flee_two_step` capability가 없거나 계약 조회에 실패하면
 fail-closed한다. legacy 계약은 observe 정책에 따라 경고 후 호환 경로를 사용할 수 있다.
@@ -153,10 +152,9 @@ profile은 다음에 함께 기록된다.
 
 ```text
 bin/cli.js
-bin/commands/register.js
 src/auth/AiRewardsAgentAuthClient.js
 src/auth/agentJwt.js
-src/auth/registerCanonicalAgent.js
+src/auth/issueCanonicalAgent.js
 bin/commands/operation.js
 bin/commands/personality.js
 src/index.js
@@ -199,7 +197,6 @@ training/train_gc_strategy_model.py
 
 ```bash
 npx appback-ai-agent init
-npx appback-ai-agent register ARW-XXXX-XXXX
 npx appback-ai-agent doctor
 npx appback-ai-agent operation show
 npx appback-ai-agent operation verify
