@@ -35,6 +35,14 @@ if (CMD === 'evaluate') {
   process.exit(code)
 }
 
+// ── link-owner: optional account association; never changes local identity ──
+if (CMD === 'link-owner') {
+  const { runLinkOwnerCommand } = require('./commands/link-owner')
+  runLinkOwnerCommand({ args: process.argv.slice(3), cwd: CWD })
+    .then(code => process.exit(code))
+  return
+}
+
 // ── doctor: 환경 점검 ──
 if (CMD === 'doctor') {
   const { execSync } = require('child_process')
@@ -363,6 +371,8 @@ Usage:
   npx appback-ai-agent evaluate              Run maze/personality quality gates
   npx appback-ai-agent personality           Configure AI behavior personality
   npx appback-ai-agent operation             Manage data/model operation contract
+  npx appback-ai-agent link-owner ARW-XXXX-XXXX
+                                             Optionally link this UUID to a code owner
   npx appback-ai-agent version               Show version
   npx appback-ai-agent help                  Show this help
 
@@ -400,4 +410,5 @@ AI Rewards identity:
   - start requests a UUID from AI Rewards when none exists
   - an existing local UUID is reused when AI Rewards issues or renews its JWT
   - no email, owner, or account credential is used by the AI Agent runtime
+  - ARW codes are optional owner links and never issue or replace UUID/JWT credentials
 `)

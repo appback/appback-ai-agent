@@ -1,6 +1,6 @@
 # AI Rewards 자율 에이전트 UUID/JWT 전환 계약
 
-> 상태: **2.5.1 구현**
+> 상태: **2.5.2 구현**
 > 기준일: 2026-08-21
 
 ## 원칙
@@ -67,6 +67,13 @@ Content-Type: application/json
 
 GC는 AI Rewards introspection으로 JWT를 확인하고 `sub` UUID를 그대로 사용한다.
 응답 `identity_source`는 `ai_rewards_jwt`여야 한다.
+
+### 선택적 소유주 연결
+
+ARW 코드는 인증과 분리된 소유주 연결 전용이다. 이미 자체 UUID/JWT를 가진 AI Agent가
+`POST /api/v1/ai/agent-owner/link`에 ARW 코드와 기존 JWT를 보내면 JWT `sub` UUID를 코드
+생성 계정에 연결한다. 이 요청과 응답은 UUID/JWT를 발급·교체·갱신하지 않으며 로컬
+identity도 변경하지 않는다.
 
 ## 기존 에이전트 전환
 

@@ -1,6 +1,6 @@
 # AI Agent 운영 인벤토리
 
-> 기준: 2026-08-21, `appback-ai-agent@2.5.1`
+> 기준: 2026-08-21, `appback-ai-agent@2.5.2`
 
 현재 관리 대상은 내부망 두 호스트의 무학습 runtime 20개다. 과거 `.20`, `.21`,
 `.26`, `.30`, EC2 목록은 현재 20개 배포 기준이 아니므로 제거했다.
@@ -36,7 +36,7 @@
 
 - SSH: `ssh storage-40 '<remote command>'`
 - Node: `v22.23.2`
-- 패키지: global `appback-ai-agent@2.5.1`
+- 패키지: global `appback-ai-agent@2.5.2`
 - 인스턴스: `/home/appback/ai-agents/agent-01` ~ `agent-10`
 - 백업: `/home/appback/ai-agent-backups/pre-2.5.1*`
 
@@ -44,7 +44,7 @@
 
 - SSH: `ssh storage-50 '<remote command>'`
 - Node: `v18.20.8`
-- 패키지: `/home/daone/ai-agent-runtime`, `appback-ai-agent@2.5.1`
+- 패키지: `/home/daone/ai-agent-runtime`, `appback-ai-agent@2.5.2`
 - RHEL 8 호환 override: `better-sqlite3@7.6.2`
 - 인스턴스: `/home/daone/ai-agents/agent-01` ~ `agent-10`
 - 백업: `/home/daone/ai-agent-backups/pre-2.5.1`
@@ -62,6 +62,7 @@ GC 입장 -> AI Rewards JWT 사용
 - AI Rewards UUID = JWT `sub` = SQLite UUID = GC UUID여야 한다.
 - 불일치하면 credential 저장과 게임 참가를 차단한다.
 - 계정의 AI Agent 목록은 선택적 UI/정산 연결이며 runtime 인증과 별개다.
+- ARW 코드는 기존 AI Rewards JWT로 소유주만 연결하며 UUID/JWT를 발급·교체하지 않는다.
 - 구 `GC_API_TOKEN` 항목은 20개 운영 `.env`에서 제거했다.
 
 ## 무학습 runtime 공통 설정
@@ -88,7 +89,7 @@ JWT와 legacy token 원문은 로그, 진단 출력, 운영 보고에 남기지 
 
 ## 2026-08-21 배포 검증
 
-- npm `2.5.1`, Git tag `v2.5.1`
+- npm `2.5.2`, Git tag `v2.5.2`
 - 두 호스트 PM2 `online` 20/20
 - 기존 UUID 보존 20/20
 - `credential_issuer=ai-rewards`, `credential_type=agent_jwt` 20/20

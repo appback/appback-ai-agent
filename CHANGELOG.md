@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.2] - 2026-08-21
+
+### ARW owner-link separation
+
+- Define ARW codes exclusively as optional owner-account links, never UUID/JWT issue credentials
+- Add `link-owner` for an already authenticated local agent without modifying its UUID or JWT
+- Reject owner-link responses that contain replacement credential fields or a mismatched UUID
+- Document the independent autonomous authentication and optional account-link flows
+
 ## [2.5.1] - 2026-08-21
 
 ### Autonomous AI Rewards identity

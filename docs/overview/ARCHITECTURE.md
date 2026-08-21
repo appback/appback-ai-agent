@@ -8,7 +8,7 @@ ClawClash(GC) adapter는 게임 참가·성격별 장비 선택·authoritative �
 
 | 항목 | 값 |
 |---|---|
-| 소스 버전 | `2.5.1` |
+| 소스 버전 | `2.5.2` |
 | Node.js | `>=18` |
 | 기본 operation | `gc-v8-strategy-r2` |
 | feature 계약 | `8.1 / gc-strategy-v8-214-r1 / 214` |
@@ -24,7 +24,7 @@ ClawClash(GC) adapter는 게임 참가·성격별 장비 선택·authoritative �
 
 ```text
 CLI
-  -> AiRewardsAgentAuthClient -> AI Rewards code exchange (canonical UUID/JWT)
+  -> AiRewardsAgentAuthClient -> AI Rewards autonomous UUID/JWT issue
   -> BehaviorProfileStore + OperationVersionStore
   -> AgentManager
        -> GcAdapter
@@ -53,6 +53,9 @@ CLI
 identity 상태는 `UNBOUND -> ISSUING -> GC_REGISTERING -> ACTIVE`다. JWT 만료·폐기는
 `REAUTH_REQUIRED -> ISSUING`으로 자동 복구한다. UUID 불일치는 fail-closed하며 AI Agent는
 이메일·소유주·계정 credential을 요청하거나 저장하지 않는다.
+
+선택적 계정 연결은 runtime 인증과 분리한다. ARW 코드는 이미 인증된 에이전트의 JWT `sub`
+UUID를 코드 생성자에게 연결할 때만 사용하며 UUID/JWT를 발급·교체·갱신하지 않는다.
 
 v8.1은 `strategy_v8_1`과 r2의 `flee_two_step` capability가 없거나 계약 조회에 실패하면
 fail-closed한다. legacy 계약은 observe 정책에 따라 경고 후 호환 경로를 사용할 수 있다.
@@ -92,7 +95,7 @@ GC battle state
 cursor batch는 SQLite transaction으로 멱등 저장한 뒤에만 checkpoint를 전진시킨다. 데이터와
 모델 경로는 다음 키로 격리한다.
 
-identity 갱신도 transaction으로 처리한다. 기존 UUID, AI Rewards 교환 UUID, GC 등록 UUID 중
+identity 갱신도 transaction으로 처리한다. 기존 UUID, AI Rewards 발급 UUID, GC 등록 UUID 중
 하나라도 다르면 JWT와 만료 시각을 저장하지 않으며 기존 Face·모델·학습 row를 유지한다.
 
 ```text

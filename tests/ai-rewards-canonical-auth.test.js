@@ -7,6 +7,7 @@ const path = require('path')
 const Database = require('better-sqlite3')
 
 const { AiRewardsAgentAuthClient } = require('../src/auth/AiRewardsAgentAuthClient')
+const { runLinkOwnerCommand } = require('../bin/commands/link-owner')
 const { validateAgentJwt } = require('../src/auth/agentJwt')
 const { redactSensitive, redactString } = require('../src/auth/redaction')
 const { issueCanonicalAgent } = require('../src/auth/issueCanonicalAgent')
@@ -90,6 +91,95 @@ test('AI Rewards issue rejects another service and non-JWT credentials', async (
     error => error.code === 'INVALID_AGENT_JWT'
   )
   assert.throws(() => validateAgentJwt('cr_agent_legacy-credential'), /not a valid JWT/)
+})
+
+test('ARW owner link uses the existing JWT and never exchanges or returns a credential', async () => {
+  const jwt = makeJwt()
+  let request = null
+  const client = new AiRewardsAgentAuthClient({
+    client: {
+      post: async (url, body, config) => {
+        request = { url, body, config }
+        return {
+          data: {
+            status: 'linked',
+            registration_id: '33333333-3333-4333-8333-333333333333',
+            service: 'gc',
+            agent_id: AGENT_ID,
+            agent_name: 'canonical-agent',
+          },
+        }
+      },
+    },
+  })
+
+  const result = await client.linkOwner({ registrationCode: 'arw-abcd-1234', agentToken: jwt })
+  assert.deepEqual(request.body, { registration_code: 'ARW-ABCD-1234' })
+  assert.equal(request.url, '/ai/agent-owner/link')
+  assert.equal(request.config.headers.Authorization, `Bearer ${jwt}`)
+  assert.equal(result.agentId, AGENT_ID)
+  assert.equal(Object.hasOwn(result, 'agentToken'), false)
+
+  const credentialReturningClient = new AiRewardsAgentAuthClient({
+    client: {
+      post: async () => ({
+        data: {
+          status: 'linked',
+          registration_id: '33333333-3333-4333-8333-333333333333',
+          service: 'gc',
+          agent_id: AGENT_ID,
+          agent_name: 'canonical-agent',
+          agent_token: jwt,
+        },
+      }),
+    },
+  })
+  await assert.rejects(
+    credentialReturningClient.linkOwner({ registrationCode: 'ARW-ABCD-1234', agentToken: jwt }),
+    error => error.code === 'OWNER_LINK_RETURNED_CREDENTIAL'
+  )
+})
+
+test('link-owner CLI preserves the stored UUID and JWT byte-for-byte', async () => {
+  const dir = tempDir('agent-owner-link-')
+  const store = new SqliteStore(dir)
+  const jwt = makeJwt()
+  store.saveCanonicalIdentity({
+    game: 'claw-clash',
+    agentId: AGENT_ID,
+    gcAgentId: AGENT_ID,
+    agentToken: jwt,
+    name: 'canonical-agent',
+  })
+  const before = store.getIdentity('claw-clash')
+  store.close()
+
+  const lines = []
+  const exitCode = await runLinkOwnerCommand({
+    args: ['ARW-ABCD-1234'],
+    cwd: dir,
+    dataDir: dir,
+    loadEnv: false,
+    authClient: {
+      linkOwner: async ({ registrationCode, agentToken }) => {
+        assert.equal(registrationCode, 'ARW-ABCD-1234')
+        assert.equal(agentToken, jwt)
+        return { agentId: AGENT_ID, agentName: 'canonical-agent' }
+      },
+    },
+    output: {
+      log: line => lines.push(line),
+      error: line => lines.push(line),
+    },
+  })
+
+  const reopened = new SqliteStore(dir)
+  const after = reopened.getIdentity('claw-clash')
+  reopened.close()
+  assert.equal(exitCode, 0)
+  assert.deepEqual(after, before)
+  assert.doesNotMatch(lines.join('\n'), /ARW-|eyJ|test-signature/)
+  fs.rmSync(dir, { recursive: true, force: true })
 })
 
 test('secret redaction removes registration codes, JWTs, bearer headers, and token fields', () => {

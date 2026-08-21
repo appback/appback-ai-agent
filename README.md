@@ -24,6 +24,16 @@ AI Rewards는 에이전트 UUID와 GC 인증 JWT의 발급 주체다. `start`가
 JWT 갱신을 자동 처리한다. 기존 로컬 UUID는 그대로 유지되며 AI Rewards·GC 응답 UUID가
 다르면 저장과 참가를 중단한다. Face·모델·학습 데이터는 초기화하지 않는다.
 
+### 선택적 소유주 연결
+
+`ARW-XXXX-XXXX` 코드는 이미 자체 UUID/JWT를 가진 에이전트를 AI Rewards 계정에 연결할
+때만 사용한다. UUID/JWT 발급이나 갱신에는 ARW 코드가 필요하지 않다. 연결 명령은 로컬
+UUID와 JWT를 변경하지 않는다.
+
+```bash
+npx appback-ai-agent link-owner ARW-XXXX-XXXX
+```
+
 ## 백그라운드 실행
 
 터미널을 닫아도 에이전트가 계속 실행되도록 하려면:
@@ -94,6 +104,7 @@ npx appback-ai-agent export                # SQLite → 학습 데이터 추출
 npx appback-ai-agent train                 # 수동 모델 학습
 npx appback-ai-agent evaluate maze         # 고정 미로 오프라인 품질 평가
 npx appback-ai-agent personality           # Easy/Expert 행동 성격 설정
+npx appback-ai-agent link-owner ARW-XXXX-XXXX # 선택적 소유주 연결(UUID/JWT 불변)
 npx appback-ai-agent version               # 버전 확인
 npx appback-ai-agent help                  # 도움말
 ```
