@@ -13,12 +13,12 @@
 | `storage-40` | `ai-agent-02` | `crab-1ec85b42` | `2dd74a56-da74-4be1-8728-6b468d1378d9` |
 | `storage-40` | `ai-agent-03` | `crab-b597fc9f` | `1f34666e-fd99-4498-9046-c3cfe856d2b7` |
 | `storage-40` | `ai-agent-04` | `crab-cae55960` | `efc0121b-d36b-49b5-a5ae-f8bd0162ebb2` |
-| `storage-40` | `ai-agent-05` | `crab-5f88c122` | `0164f774-69a2-4be6-aad9-27847dd7aecc` |
-| `storage-40` | `ai-agent-06` | `crab-f03166bd` | `13b9164c-eb02-4edd-89d4-55bfb26ff5c9` |
-| `storage-40` | `ai-agent-07` | `crab-18cf1bcd` | `a03dfad7-18db-4ee0-9969-ef6534c0331d` |
-| `storage-40` | `ai-agent-08` | `crab-f3c8444e` | `8da6d9ff-1b41-47d4-aecc-7d1375647b57` |
-| `storage-40` | `ai-agent-09` | `crab-ceab468a` | `d21aa552-faca-44df-bd05-abc082349f8f` |
-| `storage-40` | `ai-agent-10` | `crab-97d87ccf` | `b2e36f2f-5d70-41fb-a14d-74b4d4807e0b` |
+| `storage-40` | `ai-agent-05` | `crab-11ede365` | `11ede365-92a6-4076-9259-2f8cac20a0df` |
+| `storage-40` | `ai-agent-06` | `crab-54347eb5` | `2f019f5e-fdcc-476b-96ce-76eb3046ac3d` |
+| `storage-40` | `ai-agent-07` | `crab-d0cbca48` | `b19f74ba-d7af-4824-b69d-dfb0b7468ba4` |
+| `storage-40` | `ai-agent-08` | `crab-170023c2` | `170023c2-b45e-4b5d-9bb2-52f387c77906` |
+| `storage-40` | `ai-agent-09` | `crab-95cf1514` | `b13d0b0d-83f1-4f33-a52f-d4ed1d4433c6` |
+| `storage-40` | `ai-agent-10` | `crab-a80f0b1e` | `b386357f-8340-4058-b891-d732d0f8c9d9` |
 | `storage-50` | `ai-agent-01` | `crab-3ab6fd7a` | `832ed49b-6863-4a18-bef5-78a8d65aeba4` |
 | `storage-50` | `ai-agent-02` | `crab-e6c9e066` | `47664dc2-76ff-4db4-889f-81dc7d33ceb7` |
 | `storage-50` | `ai-agent-03` | `crab-b3cea572` | `ddd00a01-fd73-4889-873f-ecbfb60b8b84` |
@@ -39,6 +39,7 @@
 - 패키지: global `appback-ai-agent@2.5.2`
 - 인스턴스: `/home/appback/ai-agents/agent-01` ~ `agent-10`
 - 백업: `/home/appback/ai-agent-backups/pre-2.5.1*`
+- 기존 등록 6개 복원 전 백업: `/home/appback/ai-agent-backups/pre-existing-six-restore.QjLxT7`
 
 ### `storage-50` — `daone@192.168.33.50`
 
@@ -87,13 +88,22 @@ ssh storage-50 'export PATH=/home/daone/.nvm/versions/node/v18.20.8/bin:/usr/bin
 JWT와 legacy token 원문은 로그, 진단 출력, 운영 보고에 남기지 않는다. UUID, Face, 모델,
 전적, 보상과 DB는 에이전트 교체 대상이 아니다.
 
+### 기존 등록 6개 복원
+
+2026-08-21에 storage-40 `agent-05`~`agent-10`의 신규 UUID를 계정에 이미 등록된 기존 UUID
+6개로 교체했다. ARW나 소유주 credential은 인증에 사용하지 않았고, AI Rewards 운영
+권한으로 해당 UUID의 agent JWT를 회전한 뒤 새 로컬 identity에 저장했다. 교체 전 신규
+identity 디렉터리는 위 백업 경로에 보존했다.
+
 ## 2026-08-21 배포 검증
 
 - npm `2.5.2`, Git tag `v2.5.2`
 - 두 호스트 PM2 `online` 20/20
-- 기존 UUID 보존 20/20
+- 최종 배치 UUID 확인 20/20
+- AI Rewards 계정의 기존 등록 에이전트가 storage-40에 포함됨 10/10
 - `credential_issuer=ai-rewards`, `credential_type=agent_jwt` 20/20
 - JWT `sub` = 로컬 UUID = GC `/agents/me` UUID 20/20
 - GC `/agents/me` HTTP 200 20/20
+- 기존 커스텀 Face 연결 5/5, 기존 active V8 모델 연결 5/5
 - 무학습 설정 20/20
 - legacy `GC_API_TOKEN` 운영 `.env` 잔존 0건
