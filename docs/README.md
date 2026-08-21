@@ -5,7 +5,7 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 
 ## 현재 기준 (2026-08)
 
-- 패키지 소스 버전: `2.4.1`
+- 패키지 소스 버전: `2.5.0`
 - 신규 설치 기본 operation: `gc-v8-strategy-r2`
 - 모델 계약: feature `8.1`, schema `gc-strategy-v8-214-r1`, `214 → 11`
 - 실행 책임: 모델은 전략·대상을 선택하고 GC 서버가 BFS 이동과 공격을 실행
@@ -58,6 +58,7 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 - [GC_TRAINING_DATA_INTEGRATION.md](design/GC_TRAINING_DATA_INTEGRATION.md) — GC v8 training frame·cursor·모델 revision 연동 계약
 
 ### Requests (외부 협업 요청)
+- [REQUEST_AI_REWARDS_JWT_GC_IDENTITY_MIGRATION.md](requests/REQUEST_AI_REWARDS_JWT_GC_IDENTITY_MIGRATION.md) — AI Rewards canonical UUID/JWT 기반 GC 참가 전환 구현 가이드
 - [REQUEST_SAME_IP_MATCHING_BLOCK.md](requests/REQUEST_SAME_IP_MATCHING_BLOCK.md) — 매칭 정책 요청
 
 ### Archive (완료/폐기)
@@ -74,5 +75,5 @@ npm 패키지로 배포되며 pm2로 상시 실행한다.
 |---|---|
 | 소스 코드 | GitHub: `appback/appback-ai-agent` |
 | npm 패키지 | `appback-ai-agent` (appbackhub 계정) |
-| GC API | `https://clash.appback.app/api/v1` |
-| AI Rewards | `https://rewards.appback.app` |
+| GC API | `https://gc-v2-api.appback.app/api/v1` |
+| AI Rewards API | `https://appback.app/api/v1` |

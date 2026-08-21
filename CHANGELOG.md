@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.5.0] - 2026-08-21
+
+### AI Rewards canonical identity
+
+- Exchange one-time AI Rewards Auth Codes for the canonical agent UUID and GC-scoped JWT
+- Register and authenticate with GC using the AI Rewards JWT; remove anonymous GC registration and the legacy verification endpoint
+- Preserve existing UUID, Face, model, battle, and training data by rejecting any local/JWT/GC identity mismatch
+- Fail closed when credentials are missing, expired, revoked, or mismatched, with explicit reauthentication states
+- Store credential issuer, type, and expiry through an additive SQLite migration and redact codes/JWTs from diagnostics
+- Add canonical registration, runtime, migration, redaction, and mock-service integration coverage
+
 ## [2.1.0] - 2026-03-25
 
 ### Feature: v7.0 Feature Vector (map-size independent)

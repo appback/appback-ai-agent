@@ -39,6 +39,10 @@ if (CMD === 'evaluate') {
 if (CMD === 'doctor') {
   const { execSync } = require('child_process')
   const checks = []
+  const doctorEnvPath = path.join(CWD, '.env')
+  if (fs.existsSync(doctorEnvPath)) require('dotenv').config({ path: doctorEnvPath })
+  else require('dotenv').config()
+  let doctorIdentity = null
 
   function check(name, fn) {
     try {
@@ -103,14 +107,31 @@ if (CMD === 'doctor') {
     return 'OK'
   })
   check('Agent identity', () => {
-    const dbPath = path.join(CWD, 'data', 'agent.db')
-    if (!fs.existsSync(dbPath)) throw new Error('no database — run: appback-ai-agent start')
-    const Database = require('better-sqlite3')
-    const db = new Database(dbPath, { readonly: true })
-    const row = db.prepare('SELECT agent_id, name FROM agent_identity WHERE game = ?').get('claw-clash')
-    db.close()
-    if (!row) throw new Error('not registered — run: appback-ai-agent start')
-    return `${row.name} (${row.agent_id})`
+    const rawDataDir = process.env.DATA_DIR || 'data'
+    const dataDir = path.isAbsolute(rawDataDir) ? rawDataDir : path.resolve(CWD, rawDataDir)
+    const dbPath = path.join(dataDir, 'agent.db')
+    if (!fs.existsSync(dbPath)) throw new Error('no database — run: appback-ai-agent register <ARW-code>')
+    const SqliteStore = require(path.join(PKG_ROOT, 'src', 'data', 'storage', 'SqliteStore'))
+    const store = new SqliteStore(dataDir)
+    doctorIdentity = store.getIdentity('claw-clash')
+    store.close()
+    if (!doctorIdentity) throw new Error('not registered — run: appback-ai-agent register <ARW-code>')
+    return `${doctorIdentity.name} (${doctorIdentity.agent_id})`
+  })
+  check('Agent credential', () => {
+    if (!doctorIdentity) throw new Error('identity unavailable')
+    const { validateAgentJwt } = require(path.join(PKG_ROOT, 'src', 'auth', 'agentJwt'))
+    const jwt = validateAgentJwt(doctorIdentity.api_token, { expectedAgentId: doctorIdentity.agent_id })
+    if (doctorIdentity.credential_issuer !== 'ai-rewards' || doctorIdentity.credential_type !== 'agent_jwt') {
+      throw new Error('credential metadata is not canonical; register with an AI Rewards Auth Code')
+    }
+    return `AI Rewards JWT, expires ${jwt.expiresAt}`
+  })
+  check('GC endpoint', () => {
+    const config = require(path.join(PKG_ROOT, 'src', 'adapters', 'gc', 'config'))
+    const url = new URL(config.apiUrl)
+    if (url.protocol !== 'https:') throw new Error('HTTPS is required')
+    return url.toString()
   })
   check('ONNX model', () => {
     const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
@@ -214,7 +235,7 @@ if (CMD === 'init') {
   const { OperationVersionStore } = require(path.join(PKG_ROOT, 'src', 'config', 'OperationVersionStore'))
   const operation = new OperationVersionStore(path.join(CWD, 'config')).ensureActive()
   console.log(`Operation contract initialized: ${operation.operation_version}`)
-  console.log('\nReady! Run: npx appback-ai-agent start')
+  console.log('\nReady! Run: npx appback-ai-agent register ARW-XXXX-XXXX, then start')
   process.exit(0)
 }
 
@@ -233,56 +254,8 @@ if (CMD === 'register') {
   } else {
     require('dotenv').config()
   }
-
-  const axios = require('axios')
-  const apiUrl = process.env.GC_API_URL || 'https://clash.appback.app/api/v1'
-  let apiToken = process.env.GC_API_TOKEN || ''
-
-  // .env에 토큰 없으면 SQLite에서 기존 에이전트 토큰 읽기
-  if (!apiToken) {
-    const rawDataDir = process.env.DATA_DIR || 'data'
-    const dataDir = path.isAbsolute(rawDataDir) ? rawDataDir : path.resolve(CWD, rawDataDir)
-    const dbPath = path.join(dataDir, 'agent.db')
-    if (fs.existsSync(dbPath)) {
-      try {
-        const Database = require('better-sqlite3')
-        const db = new Database(dbPath, { readonly: true })
-        const row = db.prepare('SELECT api_token, name, agent_id FROM agent_identity WHERE game = ?').get('claw-clash')
-        db.close()
-        if (row && row.api_token) {
-          apiToken = row.api_token
-          console.log(`Found existing agent: ${row.name} (${row.agent_id})`)
-        }
-      } catch (e) { /* DB 읽기 실패 무시 */ }
-    }
-  }
-
-  if (!apiToken) {
-    console.error('Error: No agent token found.')
-    console.error('  Set GC_API_TOKEN in .env, or run "npx appback-ai-agent start" first to register an agent.')
-    process.exit(1)
-  }
-
-  ;(async () => {
-    try {
-      console.log(`Linking agent to AI Rewards with code: ${code}`)
-      const { data } = await axios.post(`${apiUrl}/agents/verify-registration`, {
-        registration_code: code,
-        agent_token: apiToken,
-      })
-
-      console.log()
-      console.log('Successfully linked!')
-      console.log(`  Agent: ${data.agent_name} (${data.agent_id})`)
-      console.log(`  Service: ${data.service}`)
-      console.log()
-      console.log('Your agent is now visible at https://rewards.appback.app')
-    } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message
-      console.error(`Error: ${msg}`)
-      process.exit(1)
-    }
-  })()
+  const { runRegisterCommand } = require('./commands/register')
+  runRegisterCommand({ registrationCode: code, cwd: CWD }).then(code => process.exit(code))
   return
 }
 
@@ -404,7 +377,7 @@ Usage:
   npx appback-ai-agent doctor                 Check environment & dependencies
   npx appback-ai-agent init                  Create .env and directories
   npx appback-ai-agent start                 Start the agent (default)
-  npx appback-ai-agent register <code>       Link agent to AI Rewards account
+  npx appback-ai-agent register <code>       Exchange AI Rewards code and register canonical GC identity
   npx appback-ai-agent export [--reuse-observations]
                                              Export profile-isolated training data
   npx appback-ai-agent train                 Run model training manually
@@ -416,6 +389,7 @@ Usage:
 
 Quick start:
   npx appback-ai-agent init
+  npx appback-ai-agent register ARW-XXXX-XXXX
   npx appback-ai-agent start
 
 Training (requires Python):
@@ -445,7 +419,8 @@ Operation versioning:
   npx appback-ai-agent operation activate v81 --yes  # v8.1 test agents only
 
 AI Rewards registration:
-  1. Go to https://rewards.appback.app → My AI Agents → Register Agent
-  2. Copy the registration code (ARW-XXXX-XXXX)
+  1. Go to https://rewards.appback.app → My AI Agents → Register Agent/Auth Code
+  2. Copy the one-time code (ARW-XXXX-XXXX)
   3. npx appback-ai-agent register ARW-XXXX-XXXX
+  4. Start only after canonical UUID/JWT registration succeeds
 `)

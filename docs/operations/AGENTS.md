@@ -130,7 +130,8 @@ generation ONNX와 #3의 `gc_move_model_single.onnx`를 추가 제거했다. 삭
 | 항목 | 값 |
 |---|---|
 | 서비스 | claw-clash (GC) |
-| API | `https://clash.appback.app/api/v1` |
+| AI Rewards 인증 | canonical UUID + `aud=game:gc` agent JWT |
+| API | `https://gc-v2-api.appback.app/api/v1` |
 | v8.1 자동 학습 | 성격별 완료 50게임마다 학습·평가·후보 업로드 (`AUTO_TRAIN_AFTER_GAMES=50`) |
 | 헬스 포트 | 9090 (충돌 시 +1 자동 증가) |
 | pm2 자동 재시작 | `pm2 save` 적용 (재부팅 시 자동 기동) |
@@ -139,7 +140,7 @@ generation ONNX와 #3의 `gc_move_model_single.onnx`를 추가 제거했다. 삭
 
 ## Quick Operations
 
-### 토큰 / 게임 수 확인 (각 서버에서 실행)
+### canonical identity / 게임 수 확인 (각 서버에서 실행)
 
 ```bash
 sqlite3 ~/data/agent.db "SELECT name, agent_id FROM agent_identity"
@@ -151,9 +152,13 @@ sqlite3 ~/data/agent.db "SELECT COUNT(*) FROM game_sessions WHERE result IS NOT 
 ### 모델 버전 확인 (서버 측)
 
 ```bash
-TOKEN=$(sqlite3 ~/data/agent.db "SELECT api_token FROM agent_identity WHERE game='claw-clash'")
-curl -s https://clash.appback.app/api/v1/agents/me -H "Authorization: Bearer $TOKEN" | jq '.name, .model_version, .model_uploaded_at'
+JWT=$(sqlite3 ~/data/agent.db "SELECT api_token FROM agent_identity WHERE game='claw-clash'")
+curl -s https://gc-v2-api.appback.app/api/v1/agents/me -H "Authorization: Bearer $JWT" | jq '.id, .name, .model_version, .model_uploaded_at'
 ```
+
+JWT는 출력하거나 다른 인스턴스와 공유하지 않는다. 만료·폐기 시 기존 AI Rewards 등록의
+Auth Code로 `appback-ai-agent register <code>`를 다시 실행하며 UUID, Face, 모델과 학습
+데이터를 새 identity로 교체하지 않는다.
 
 ### pm2 상태
 

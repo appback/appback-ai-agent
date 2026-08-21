@@ -5,6 +5,7 @@ const GcStrategyEngine = require('./GcStrategyEngine')
 const GcFeatureBuilder = require('./GcFeatureBuilder')
 const GcEquipmentManager = require('./GcEquipmentManager')
 const { createLogger } = require('../../utils/logger')
+const { validateAgentJwt } = require('../../auth/agentJwt')
 const { INACTIVE_STATES } = require('./constants')
 const {
   FLEE_TWO_STEP_CAPABILITY,
@@ -16,6 +17,15 @@ const {
   evaluateServerContract,
 } = require('../../config/GcServerContract')
 const log = createLogger('gc-adapter')
+
+const AUTH_STATES = Object.freeze({
+  UNBOUND: 'UNBOUND',
+  CODE_REQUIRED: 'CODE_REQUIRED',
+  EXCHANGING: 'EXCHANGING',
+  GC_REGISTERING: 'GC_REGISTERING',
+  ACTIVE: 'ACTIVE',
+  REAUTH_REQUIRED: 'REAUTH_REQUIRED',
+})
 
 // v6.0 action labels: model output index → direction
 const ACTION_LABELS = ['stay', 'up', 'down', 'left', 'right']
@@ -31,6 +41,11 @@ class GcAdapter extends BaseGameAdapter {
       this.runtimeContext.operation_version
     )
     this.api = new GcApiClient(this.config, this.clientContract)
+    this.api.onAuthFailure(code => {
+      this.authState = AUTH_STATES.REAUTH_REQUIRED
+      this._stopQueuePolling()
+      log.error(`${code}: AI Rewards Auth Code reauthentication required`)
+    })
     this.ws = new GcSocketClient(this.config)
     this.strategyEngine = new GcStrategyEngine()
     this.featureBuilder = new GcFeatureBuilder()
@@ -51,6 +66,7 @@ class GcAdapter extends BaseGameAdapter {
     this._queuedSince = null
     this._reconnecting = false
     this._busyCount = 0
+    this.authState = AUTH_STATES.UNBOUND
   }
 
   get gameName() { return 'claw-clash' }
@@ -58,56 +74,7 @@ class GcAdapter extends BaseGameAdapter {
 
   async initialize() {
     await this._checkServerContract()
-
-    // Try loading identity from SQLite
-    if (this.dataCollector) {
-      const saved = this.dataCollector.store.getIdentity(this.gameName)
-      if (saved && !this.config.apiToken) {
-        this.apiToken = saved.api_token
-        this.agentId = saved.agent_id
-        this.api.setToken(this.apiToken)
-        log.info(`Loaded saved identity: ${saved.name} (${saved.agent_id})`)
-      }
-    }
-
-    // Use env token if provided
-    if (this.config.apiToken && !this.apiToken) {
-      this.apiToken = this.config.apiToken
-      this.api.setToken(this.apiToken)
-    }
-
-    // Validate existing token
-    if (this.apiToken) {
-      try {
-        const me = await this.api.getAgentMe()
-        this.agentId = me.id
-        log.info(`Agent: ${me.name} (${me.id})`)
-      } catch (err) {
-        log.error(`Token validation failed: ${err.message}`)
-        throw new Error('Agent token validation failed. Check server status or re-register manually.')
-      }
-    }
-
-    // No token available — auto-register
-    if (!this.apiToken) {
-      log.info('No agent token found. Auto-registering...')
-      try {
-        const reg = await this.api.register()
-        this.apiToken = reg.api_token || reg.token
-        this.agentId = reg.agent_id || reg.id
-        this.api.setToken(this.apiToken)
-        log.info(`Registered as: ${reg.name} (${this.agentId})`)
-
-        // Persist to SQLite
-        if (this.dataCollector) {
-          this.dataCollector.store.saveIdentity(this.gameName, this.agentId, this.apiToken, reg.name)
-          log.info('Identity saved to database')
-        }
-      } catch (err) {
-        const msg = err.response?.data?.message || err.message
-        throw new Error(`Auto-registration failed: ${msg}`)
-      }
-    }
+    await this._initializeCanonicalIdentity()
 
     if (this.modelBootstrapper) {
       try {
@@ -148,6 +115,80 @@ class GcAdapter extends BaseGameAdapter {
     } else {
       log.info('GC server-owned inference active; legacy viewer WebSocket disabled')
     }
+  }
+
+  async _initializeCanonicalIdentity() {
+    const store = this.dataCollector?.store || null
+    const saved = store?.getIdentity(this.gameName) || null
+    const token = this.config.agentJwt || this.config.apiToken || saved?.api_token || ''
+
+    if (!token) {
+      this.authState = AUTH_STATES.CODE_REQUIRED
+      throw new Error(
+        'AI Rewards agent code required. Run: appback-ai-agent register <ARW-code>'
+      )
+    }
+
+    let credential
+    try {
+      credential = validateAgentJwt(token, { expectedAgentId: saved?.agent_id || undefined })
+      this.api.setToken(token)
+    } catch (error) {
+      this.authState = AUTH_STATES.REAUTH_REQUIRED
+      throw new Error(`${error.code || 'INVALID_AI_REWARDS_AGENT'}: ${error.message}`)
+    }
+
+    this.apiToken = token
+    let identity
+    try {
+      const me = await this.api.getAgentMe()
+      identity = {
+        agent_id: me?.id || me?.agent_id,
+        name: me?.name || saved?.name || null,
+        identity_source: 'ai_rewards_jwt',
+      }
+    } catch (error) {
+      const code = gcErrorCode(error)
+      if (code === 'AGENT_NOT_REGISTERED') {
+        this.authState = AUTH_STATES.GC_REGISTERING
+        identity = await this.api.register()
+      } else if (
+        Number(error.response?.status) === 401 ||
+        code === 'AI_REWARDS_JWT_REQUIRED' ||
+        code === 'INVALID_AI_REWARDS_AGENT'
+      ) {
+        this.authState = AUTH_STATES.REAUTH_REQUIRED
+        throw new Error(`${code || 'INVALID_AI_REWARDS_AGENT'}: issue an Auth Code and register again`)
+      } else {
+        throw new Error(`GC agent authentication check failed: ${error.message}`)
+      }
+    }
+
+    if (identity.agent_id !== credential.agentId) {
+      this.authState = AUTH_STATES.REAUTH_REQUIRED
+      throw new Error(
+        'AGENT_IDENTITY_MISMATCH: GC UUID does not match the AI Rewards canonical UUID'
+      )
+    }
+    if (saved?.agent_id && saved.agent_id !== identity.agent_id) {
+      this.authState = AUTH_STATES.REAUTH_REQUIRED
+      throw new Error('AGENT_IDENTITY_MISMATCH: existing local UUID was preserved')
+    }
+
+    if (store) {
+      store.saveCanonicalIdentity({
+        game: this.gameName,
+        agentId: credential.agentId,
+        gcAgentId: identity.agent_id,
+        agentToken: token,
+        name: identity.name || saved?.name,
+        expiresAt: credential.expiresAt,
+      })
+    }
+
+    this.agentId = credential.agentId
+    this.authState = AUTH_STATES.ACTIVE
+    log.info(`Canonical agent active: ${identity.name || 'unnamed'} (${this.agentId})`)
   }
 
   async _checkServerContract() {
@@ -226,6 +267,10 @@ class GcAdapter extends BaseGameAdapter {
   }
 
   async discoverGames() {
+    if (this.authState !== AUTH_STATES.ACTIVE) {
+      return { status: this.authState === AUTH_STATES.REAUTH_REQUIRED ? 'reauth_required' : 'auth_required' }
+    }
+
     // Skip if reconnect handler is still running
     if (this._reconnecting) {
       log.info('Reconnect in progress, skipping discovery')
@@ -306,6 +351,7 @@ class GcAdapter extends BaseGameAdapter {
   }
 
   async joinGame() {
+    if (this.authState !== AUTH_STATES.ACTIVE) return { status: 'reauth_required' }
     try {
       // Select optimal loadout based on historical performance
       this.currentLoadout = this.equipmentManager.selectLoadout()
@@ -812,4 +858,13 @@ function isPathPassable(terrain, x, y, gridW, gridH, occupied) {
   return t !== 1 && t !== 2
 }
 
+function gcErrorCode(error) {
+  const data = error?.response?.data
+  if (typeof data?.error === 'string') return data.error
+  if (typeof data?.error?.code === 'string') return data.error.code
+  if (typeof data?.code === 'string') return data.code
+  return null
+}
+
+GcAdapter.AUTH_STATES = AUTH_STATES
 module.exports = GcAdapter

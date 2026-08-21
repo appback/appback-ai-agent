@@ -1,10 +1,14 @@
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 }
 const level = LEVELS[process.env.LOG_LEVEL || 'info'] || 1
+const { redactSensitive, redactString } = require('../auth/redaction')
 
 function fmt(lvl, tag, msg, data) {
   const ts = new Date().toISOString()
-  const base = `[${ts}] [${lvl.toUpperCase()}] [${tag}] ${msg}`
-  if (data !== undefined) console.log(base, typeof data === 'object' ? JSON.stringify(data) : data)
+  const base = `[${ts}] [${lvl.toUpperCase()}] [${tag}] ${redactString(msg)}`
+  if (data !== undefined) {
+    const safe = redactSensitive(data)
+    console.log(base, typeof safe === 'object' ? JSON.stringify(safe) : safe)
+  }
   else console.log(base)
 }
 

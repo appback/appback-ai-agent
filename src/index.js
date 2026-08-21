@@ -1,12 +1,14 @@
+const { redactString } = require('./auth/redaction')
+
 // Global error handler — catch native module failures etc.
 process.on('uncaughtException', (err) => {
-  console.error('[FATAL] Uncaught exception:', err.message || err)
+  console.error('[FATAL] Uncaught exception:', redactString(err.message || err))
   if (String(err.message).includes('better-sqlite3') || String(err.message).includes('better_sqlite3')) {
     console.error('\n  better-sqlite3 failed to load.')
     console.error('  On Windows, run: npm install --global windows-build-tools')
     console.error('  Or install Visual Studio C++ Build Tools + Python 3.\n')
   }
-  console.error(err.stack || err)
+  console.error(redactString(err.stack || err))
   process.exit(1)
 })
 
@@ -211,6 +213,6 @@ function parseBoolean(value, fallback) {
 
 main().catch(err => {
   log.error('Fatal error', err.message)
-  console.error(err.stack || err)
+  console.error(redactString(err.stack || err))
   process.exit(1)
 })

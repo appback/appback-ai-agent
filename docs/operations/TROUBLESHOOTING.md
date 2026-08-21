@@ -9,12 +9,12 @@
 ### `g++: unrecognized option '-std=c++20'`
 - **원인:** gcc 11 이하 (RHEL 8 = gcc 8.5.0). `better-sqlite3` 11.x가 C++20 필요.
 - **확인:** `g++ --version`
-- **해결:** Node 20 + `better-sqlite3@9.6.0` override. [INSTALL.md#rhel-8](INSTALL.md) 참조.
+- **해결:** RHEL 8.10 실측 조합인 Node 18 + `better-sqlite3@7.6.2` override. [INSTALL.md#rhel-8](INSTALL.md) 참조.
 
 ### `prebuild-install` 실패
 - **원인:** glibc < 2.29. prebuilt 바이너리 호환 안 됨.
 - **확인:** `ldd --version`
-- **해결:** 동일 (Node 20 + better-sqlite3 9.6.0)
+- **해결:** 동일 (Node 18 + better-sqlite3 7.6.2)
 
 ### `npx: command not found` (pm2)
 - **원인:** pm2가 nvm path 없이 실행됨.
@@ -36,13 +36,33 @@
 - **원인:** 대기 인원 부족 또는 동일 IP 매칭 제한.
 - **확인:**
   ```bash
-  curl -s https://clash.appback.app/api/v1/queue/status -H "Authorization: Bearer $TOKEN"
+  curl -s https://gc-v2-api.appback.app/api/v1/queue/status -H "Authorization: Bearer $TOKEN"
   ```
 - **참고:** [REQUEST_SAME_IP_MATCHING_BLOCK](../requests/REQUEST_SAME_IP_MATCHING_BLOCK.md)
 
 ### `Cancelled: pre-auth` (challenge submit 시)
-- **원인:** 토큰 만료 또는 잘못된 등록.
-- **해결:** `agent.db` 백업 후 `init` 다시 실행.
+- **원인:** AI Rewards JWT 만료·폐기 또는 GC 등록 누락.
+- **해결:** 기존 에이전트의 AI Rewards 화면에서 Auth Code를 발급하고 재인증한다.
+  ```bash
+  appback-ai-agent register ARW-XXXX-XXXX
+  appback-ai-agent doctor
+  pm2 restart ai-agent
+  ```
+- `agent.db`, 모델 또는 학습 데이터를 삭제하지 않는다.
+
+### `AI_REWARDS_JWT_REQUIRED` / `INVALID_AI_REWARDS_AGENT`
+
+- **원인:** JWT가 없거나 구형 GC token, 만료·폐기 JWT를 사용함.
+- **해결:** 신규 에이전트는 Register Agent 코드, 기존 에이전트는 기존 등록의 Auth Code로
+  `appback-ai-agent register <code>`를 실행한다.
+- `GC_API_TOKEN` alias에 구형 token을 넣어 우회할 수 없다. alias도 AI Rewards JWT만 허용한다.
+
+### `AGENT_IDENTITY_MISMATCH`
+
+- **원인:** SQLite UUID, JWT `sub`, GC 응답 UUID 중 하나가 다름.
+- **동작:** credential 저장, queue 참가와 모델 업로드가 모두 차단된다.
+- **해결:** 기존 UUID가 연결된 AI Rewards 등록과 Auth Code를 확인한다. 새 UUID로 덮어쓰거나
+  DB/Face/모델 데이터를 초기화하지 않는다.
 
 ---
 

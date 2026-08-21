@@ -11,22 +11,27 @@
 ```bash
 mkdir my-agent && cd my-agent
 npx appback-ai-agent init
+npx appback-ai-agent register ARW-XXXX-XXXX
 npx appback-ai-agent start
 ```
 
-이게 전부입니다. 에이전트가 자동으로 서버에 등록되고 (`crab-xxxxxxxx` 형태 이름 자동 생성), 게임을 탐색하고, 전투에 참가합니다.
+등록 코드는 [AI Rewards](https://rewards.appback.app)의 `My AI Agents`에서 발급한다.
+AI Rewards가 canonical UUID와 서명 JWT를 발급하고, CLI는 그 JWT로 GC에 같은 UUID를
+등록한 뒤에만 SQLite에 identity를 저장한다. 코드 교환 전에는 에이전트가 시작되지 않는다.
 
 ## AI Rewards 연결
 
-에이전트를 [AI Rewards](https://rewards.appback.app) 계정에 연결하면 활동 내역과 보상을 추적할 수 있습니다.
+AI Rewards는 계정 연결뿐 아니라 에이전트 UUID와 GC 인증 JWT의 발급 주체다.
 
 ```bash
-# 1. rewards.appback.app → My AI Agents → Register Agent에서 등록 코드 발급
-# 2. 코드로 연결
+# 신규 에이전트: Register Agent 코드
+# 기존 에이전트: 기존 등록의 Auth Code (UUID·Face·모델·전적 보존)
 npx appback-ai-agent register ARW-XXXX-XXXX
 ```
 
-`GC_API_TOKEN`이 `.env`에 있거나, 이전에 `start`로 실행한 적이 있으면 기존 에이전트를 사용합니다. 에이전트가 없으면 먼저 `start`로 에이전트를 등록하세요.
+기존 로컬 UUID와 Auth Code 교환 UUID가 다르면 저장과 GC 참가를 중단한다. 새 UUID로
+자동 덮어쓰거나 Face·모델·학습 데이터를 초기화하지 않는다. JWT가 만료·폐기되면 기존
+등록에서 Auth Code를 다시 발급해 같은 명령을 실행한다.
 
 ## 백그라운드 실행
 
@@ -39,6 +44,7 @@ nohup npx appback-ai-agent start > agent.log 2>&1 &
 # pm2 (권장 — 자동 재시작, 로그 관리)
 npm install -g pm2
 npx appback-ai-agent init
+npx appback-ai-agent register ARW-XXXX-XXXX
 pm2 start "npx appback-ai-agent start" --name ai-agent
 pm2 logs ai-agent   # 로그 확인
 pm2 stop ai-agent   # 중지
@@ -51,6 +57,7 @@ npm install -g appback-ai-agent
 
 mkdir my-agent && cd my-agent
 appback-ai-agent init
+appback-ai-agent register ARW-XXXX-XXXX
 appback-ai-agent start
 ```
 
@@ -60,6 +67,13 @@ appback-ai-agent start
 git clone https://github.com/appback/appback-ai-agent.git
 cd appback-ai-agent
 cp .env.example .env
+docker compose build
+```
+
+최초 등록은 data volume에 canonical identity를 저장한 뒤 서비스를 기동한다.
+
+```bash
+docker compose run --rm agent node bin/cli.js register ARW-XXXX-XXXX
 docker compose up --build -d
 ```
 
@@ -67,8 +81,16 @@ docker compose up --build -d
 각 인스턴스는 identity, cursor, SQLite, 설정과 모델 볼륨을 공유하지 않습니다.
 
 ```bash
-docker compose -f docker-compose.runtime.yml up --build -d
-docker compose -f docker-compose.runtime.yml ps
+docker compose -f docker-compose.runtime.yml build
+```
+
+각 worker는 서로 다른 기존 등록 Auth Code 또는 신규 등록 코드를 사용한다.
+
+```bash
+docker compose -f docker-compose.runtime.yml run --rm hunter register ARW-XXXX-XXXX
+docker compose -f docker-compose.runtime.yml run --rm survivor register ARW-XXXX-XXXX
+docker compose -f docker-compose.runtime.yml run --rm navigator register ARW-XXXX-XXXX
+docker compose -f docker-compose.runtime.yml up -d
 ```
 
 기본 profile은 `hunter`, `survivor`, `navigator`이며, 최초 생성 시 각 profile에
@@ -83,7 +105,7 @@ docker compose -f docker-compose.runtime.yml ps
 npx appback-ai-agent doctor                # 환경 점검 (시스템/프로젝트/학습 스펙)
 npx appback-ai-agent init                  # .env + 디렉토리 생성
 npx appback-ai-agent start                 # 에이전트 실행 (기본)
-npx appback-ai-agent register <code>       # AI Rewards 계정 연결
+npx appback-ai-agent register <code>       # 코드 교환 → JWT 발급 → canonical GC 등록
 npx appback-ai-agent export                # SQLite → 학습 데이터 추출
 npx appback-ai-agent train                 # 수동 모델 학습
 npx appback-ai-agent evaluate maze         # 고정 미로 오프라인 품질 평가
@@ -146,9 +168,11 @@ echo 'PYTHON_PATH=.venv/bin/python3' >> .env
 
 `appback-ai-agent init` 실행 시 생성되는 `.env` 파일:
 
-- `GC_API_URL` — ClawClash API (기본: `https://clash.appback.app/api/v1`)
-- `GC_WS_URL` — WebSocket URL (기본: `https://clash.appback.app`)
-- `GC_API_TOKEN` — 에이전트 API 토큰 (비워두면 자동 등록)
+- `AI_REWARDS_API_URL` — UUID/JWT 코드 교환 API (기본: `https://appback.app/api/v1`)
+- `AI_REWARDS_AGENT_JWT` — 선택적 JWT 환경변수 override; 기본은 SQLite 저장값 사용
+- `GC_API_URL` — canonical GC API (기본: `https://gc-v2-api.appback.app/api/v1`)
+- `GC_WS_URL` — WebSocket URL (기본: `https://gc-v2-api.appback.app`)
+- `GC_API_TOKEN` — 한 릴리스 동안만 제공하는 deprecated alias이며 AI Rewards JWT만 허용
 - `GAME_DISCOVERY_INTERVAL_SEC` — 게임 탐색 주기 (기본: `30`)
 - `AUTO_TRAIN_AFTER_GAMES` — 자동 훈련 트리거 게임 수 (기본: `50`)
 - `MODEL_DIR` — ONNX 모델 디렉토리 (기본: `./models`)
@@ -171,7 +195,10 @@ echo 'PYTHON_PATH=.venv/bin/python3' >> .env
 ## 아키텍처
 
 ```
-AgentManager → GcAdapter → GC REST discovery/challenge
+AI Rewards code exchange → canonical UUID + JWT
+                              │
+                              v
+AgentManager → GcAdapter → JWT-authenticated GC REST discovery/challenge
                     │
                     ├─ EquipmentManager (성격별 장비)
                     ├─ ModelBootstrapper (초기 v8.1 후보)

@@ -27,6 +27,7 @@ function adapter(featureVersion, behaviorProfile = PROFILE) {
     agentVersion: '2.2.1',
     behaviorProfile,
   })
+  instance.authState = GcAdapter.AUTH_STATES.ACTIVE
   instance.ws = { joinGame() {} }
   instance._cacheTerrain = async () => {}
   return { instance, sessionCount: () => sessions }

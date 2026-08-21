@@ -8,7 +8,7 @@ ClawClash(GC) adapter는 게임 참가·성격별 장비 선택·authoritative �
 
 | 항목 | 값 |
 |---|---|
-| 소스 버전 | `2.4.1` |
+| 소스 버전 | `2.5.0` |
 | Node.js | `>=18` |
 | 기본 operation | `gc-v8-strategy-r2` |
 | feature 계약 | `8.1 / gc-strategy-v8-214-r1 / 214` |
@@ -24,10 +24,11 @@ ClawClash(GC) adapter는 게임 참가·성격별 장비 선택·authoritative �
 
 ```text
 CLI
+  -> AiRewardsAgentAuthClient -> AI Rewards code exchange (canonical UUID/JWT)
   -> BehaviorProfileStore + OperationVersionStore
   -> AgentManager
        -> GcAdapter
-            -> GcApiClient -----------------------> GC REST
+            -> GcApiClient -- AI Rewards JWT -----> canonical GC REST
             -> GcEquipmentManager
             -> GcV81ModelBootstrapper
             -> legacy GcSocketClient (v7 only)
@@ -44,10 +45,15 @@ CLI
 1. behavior profile과 operation contract를 읽는다.
 2. 설정 파일이 없는 신규 설치는 v8.1 r2 계약을 저장한다.
 3. `GET /api/v1/agent-contract`로 protocol, feature와 capability를 확인한다.
-4. 저장된 token을 검증하거나 새 GC identity를 자동 등록한다.
-5. 장비 catalog와 성격별 선택기를 초기화한다.
-6. 필요한 경우 checksummed v8.1 bootstrap 후보를 업로드한다.
-7. 게임 discovery와 authoritative training feed scheduler를 시작한다.
+4. SQLite 또는 `AI_REWARDS_AGENT_JWT`에서 AI Rewards JWT를 읽는다.
+5. JWT `sub`와 저장 UUID를 비교하고 `/agents/me`의 GC UUID까지 동일한지 확인한다.
+6. JWT는 유효하지만 GC에 아직 없으면 JWT로 `/agents/register`를 호출한다.
+7. 세 UUID가 같을 때만 `ACTIVE`로 전환하고 장비·모델·scheduler를 초기화한다.
+
+JWT가 없으면 `CODE_REQUIRED`, 만료·폐기 또는 UUID 불일치는 `REAUTH_REQUIRED`로
+fail-closed한다. `start`는 익명 GC 등록, 새 UUID 발급 또는 구형 token fallback을 하지 않는다.
+신규 등록과 기존 에이전트 재인증은 모두 먼저 `appback-ai-agent register <ARW-code>`를
+실행해야 한다.
 
 v8.1은 `strategy_v8_1`과 r2의 `flee_two_step` capability가 없거나 계약 조회에 실패하면
 fail-closed한다. legacy 계약은 observe 정책에 따라 경고 후 호환 경로를 사용할 수 있다.
@@ -76,7 +82,7 @@ GC battle state
 
 `data/agent.db`의 핵심 table:
 
-- `agent_identity`: GC agent ID와 token
+- `agent_identity`: AI Rewards canonical UUID, JWT, issuer/type/expiry metadata
 - `gc_training_sync_state`: stream/operation별 cursor
 - `gc_training_sessions`: authoritative session manifest
 - `gc_training_frames`: versioned vector, raw state, inference/execution record
@@ -86,6 +92,9 @@ GC battle state
 
 cursor batch는 SQLite transaction으로 멱등 저장한 뒤에만 checkpoint를 전진시킨다. 데이터와
 모델 경로는 다음 키로 격리한다.
+
+identity 갱신도 transaction으로 처리한다. 기존 UUID, AI Rewards 교환 UUID, GC 등록 UUID 중
+하나라도 다르면 JWT와 만료 시각을 저장하지 않으며 기존 Face·모델·학습 row를 유지한다.
 
 ```text
 operation_version + behavior_profile_hash
@@ -144,6 +153,10 @@ profile은 다음에 함께 기록된다.
 
 ```text
 bin/cli.js
+bin/commands/register.js
+src/auth/AiRewardsAgentAuthClient.js
+src/auth/agentJwt.js
+src/auth/registerCanonicalAgent.js
 bin/commands/operation.js
 bin/commands/personality.js
 src/index.js
@@ -186,6 +199,7 @@ training/train_gc_strategy_model.py
 
 ```bash
 npx appback-ai-agent init
+npx appback-ai-agent register ARW-XXXX-XXXX
 npx appback-ai-agent doctor
 npx appback-ai-agent operation show
 npx appback-ai-agent operation verify

@@ -4,6 +4,7 @@ const FormData = require('form-data')
 const { createLogger } = require('../../utils/logger')
 const { retry } = require('../../utils/retry')
 const { buildAgentHeaders, validateLoadoutProfileContext } = require('../../config/GcServerContract')
+const { isUuid, validateAgentJwt } = require('../../auth/agentJwt')
 const log = createLogger('gc-api')
 
 class GcApiClient {
@@ -14,6 +15,31 @@ class GcApiClient {
       headers: clientContract ? buildAgentHeaders(clientContract) : undefined,
     })
     this.token = null
+    this.credentialRejected = false
+    this.authFailureHandler = null
+    this.client.interceptors.request.use(request => {
+      if (this.credentialRejected && request.url !== '/agent-contract') {
+        const error = new Error('REAUTH_REQUIRED: AI Rewards agent JWT must be reissued')
+        error.code = 'REAUTH_REQUIRED'
+        return Promise.reject(error)
+      }
+      return request
+    })
+    this.client.interceptors.response.use(
+      response => response,
+      error => {
+        const code = gcErrorCode(error)
+        if (
+          Number(error.response?.status) === 401 ||
+          code === 'AI_REWARDS_JWT_REQUIRED' ||
+          code === 'INVALID_AI_REWARDS_AGENT'
+        ) {
+          this.credentialRejected = true
+          this.authFailureHandler?.(code || 'INVALID_AI_REWARDS_AGENT')
+        }
+        return Promise.reject(error)
+      }
+    )
   }
 
   async getAgentContract() {
@@ -41,16 +67,34 @@ class GcApiClient {
   }
 
   setToken(token) {
+    this.token = null
+    this.credentialRejected = true
+    delete this.client.defaults.headers.common['Authorization']
+    const credential = validateAgentJwt(token)
     this.token = token
+    this.credentialRejected = false
     this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    return credential
+  }
+
+  onAuthFailure(handler) {
+    this.authFailureHandler = typeof handler === 'function' ? handler : null
   }
 
   async register() {
+    if (!this.token) throw new Error('AI_REWARDS_JWT_REQUIRED: register requires an AI Rewards agent JWT')
     log.info('Registering agent...')
     const { data } = await this.client.post('/agents/register', {
       model_name: 'appback-ai-agent',
     })
-    return data
+    if (!data || !isUuid(data.agent_id) || data.identity_source !== 'ai_rewards_jwt') {
+      throw new Error('GC registration did not return a canonical AI Rewards identity')
+    }
+    return {
+      ...data,
+      agent_id: data.agent_id,
+      identity_source: data.identity_source,
+    }
   }
 
   async getChallenge() {
@@ -138,6 +182,14 @@ class GcApiClient {
     const { data } = await this.client.delete('/agents/me/model')
     return data
   }
+}
+
+function gcErrorCode(error) {
+  const data = error?.response?.data
+  if (typeof data?.error === 'string') return data.error
+  if (typeof data?.error?.code === 'string') return data.error.code
+  if (typeof data?.code === 'string') return data.code
+  return null
 }
 
 module.exports = GcApiClient

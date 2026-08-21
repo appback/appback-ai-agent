@@ -14,10 +14,15 @@ COPY package.json package-lock.json* ./
 RUN npm ci --production
 
 # Application
+COPY bin/ ./bin/
 COPY src/ ./src/
 COPY config/ ./config/
+COPY bootstrap/ ./bootstrap/
 COPY training/ ./training/
+COPY .env.example ./
+
+RUN chmod 0755 ./bin/cli.js
 
 VOLUME ["/app/models", "/app/data"]
 
-CMD ["node", "src/index.js"]
+CMD ["node", "bin/cli.js", "start"]

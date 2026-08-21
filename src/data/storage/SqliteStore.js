@@ -1,6 +1,8 @@
 const Database = require('better-sqlite3')
+const fs = require('fs')
 const path = require('path')
 const { createLogger } = require('../../utils/logger')
+const { isUuid, validateAgentJwt } = require('../../auth/agentJwt')
 const log = createLogger('sqlite')
 
 const LEGACY_CONTEXT = Object.freeze({
@@ -16,8 +18,10 @@ const LEGACY_CONTEXT = Object.freeze({
 class SqliteStore {
   constructor(dataDir, runtimeContext = LEGACY_CONTEXT) {
     const dbPath = path.join(dataDir || './data', 'agent.db')
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: 0o700 })
     this.runtimeContext = { ...LEGACY_CONTEXT, ...runtimeContext }
     this.db = new Database(dbPath)
+    try { fs.chmodSync(dbPath, 0o600) } catch { /* best effort on non-POSIX filesystems */ }
     this.db.pragma('journal_mode = WAL')
     this._initSchema()
     log.info(`SQLite database: ${dbPath}`)
@@ -30,6 +34,9 @@ class SqliteStore {
         agent_id TEXT NOT NULL,
         api_token TEXT NOT NULL,
         name TEXT,
+        credential_issuer TEXT,
+        credential_type TEXT,
+        token_expires_at TEXT,
         registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -139,6 +146,7 @@ class SqliteStore {
       CREATE INDEX IF NOT EXISTS idx_gc_loadout_results_profile
       ON gc_loadout_results(operation_version, behavior_profile_hash, id);
     `)
+    this._migrateIdentityCredentials()
     this._migrateOperationScope()
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_sessions_operation_profile
@@ -147,6 +155,21 @@ class SqliteStore {
       ON training_samples(model_type, operation_version, behavior_profile_hash, id);
     `)
     log.info('Schema initialized')
+  }
+
+  _migrateIdentityCredentials() {
+    const existing = new Set(this.db.pragma('table_info(agent_identity)').map(column => column.name))
+    const columns = {
+      credential_issuer: 'TEXT',
+      credential_type: 'TEXT',
+      token_expires_at: 'TEXT',
+    }
+    const migrate = this.db.transaction(() => {
+      for (const [name, definition] of Object.entries(columns)) {
+        if (!existing.has(name)) this.db.exec(`ALTER TABLE agent_identity ADD COLUMN ${name} ${definition}`)
+      }
+    })
+    migrate()
   }
 
   _migrateOperationScope() {
@@ -188,11 +211,47 @@ class SqliteStore {
   }
 
   // --- Identity ---
+  saveCanonicalIdentity({ game, agentId, gcAgentId, agentToken, name, expiresAt }) {
+    if (!game || !isUuid(agentId) || gcAgentId !== agentId) {
+      throw new Error('Canonical identity UUID validation failed')
+    }
+    const jwt = validateAgentJwt(agentToken, { expectedAgentId: agentId })
+    const normalizedExpiry = new Date(expiresAt || jwt.expiresAt)
+    if (Number.isNaN(normalizedExpiry.getTime()) || normalizedExpiry.getTime() <= Date.now()) {
+      throw new Error('Canonical identity token expiry is invalid')
+    }
+
+    const save = this.db.transaction(() => {
+      const existing = this.db.prepare(
+        'SELECT agent_id FROM agent_identity WHERE game = ?'
+      ).get(game)
+      if (existing && existing.agent_id !== agentId) {
+        throw new Error('Existing agent UUID does not match the AI Rewards canonical UUID')
+      }
+      this.db.prepare(`
+        INSERT INTO agent_identity (
+          game, agent_id, api_token, name, credential_issuer, credential_type, token_expires_at
+        ) VALUES (?, ?, ?, ?, 'ai-rewards', 'agent_jwt', ?)
+        ON CONFLICT(game) DO UPDATE SET
+          api_token = excluded.api_token,
+          name = excluded.name,
+          credential_issuer = excluded.credential_issuer,
+          credential_type = excluded.credential_type,
+          token_expires_at = excluded.token_expires_at
+      `).run(game, agentId, agentToken, name || null, normalizedExpiry.toISOString())
+    })
+    save()
+    return this.getIdentity(game)
+  }
+
   saveIdentity(game, agentId, apiToken, name) {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO agent_identity (game, agent_id, api_token, name)
-      VALUES (?, ?, ?, ?)
-    `).run(game, agentId, apiToken, name)
+    return this.saveCanonicalIdentity({
+      game,
+      agentId,
+      gcAgentId: agentId,
+      agentToken: apiToken,
+      name,
+    })
   }
 
   getIdentity(game) {

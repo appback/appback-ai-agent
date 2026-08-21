@@ -18,10 +18,13 @@ class AgentManager {
 
   async start() {
     log.info('Starting agent manager...')
+    const failures = []
+    let initialized = 0
 
     for (const [name, adapter] of this.adapters) {
       try {
         await adapter.initialize()
+        initialized++
         log.info(`Initialized adapter: ${name}`)
 
         const intervalSec = adapter.config.discoveryIntervalSec ||
@@ -38,7 +41,12 @@ class AgentManager {
         this.schedulers.set(name, scheduler)
       } catch (err) {
         log.error(`Failed to initialize adapter: ${name}`, err.message)
+        failures.push({ name, error: err })
       }
+    }
+
+    if (failures.length > 0 && initialized === 0) {
+      throw failures[0].error
     }
 
     log.info('Agent manager started')
