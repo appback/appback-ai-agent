@@ -168,7 +168,11 @@ echo 'PYTHON_PATH=.venv/bin/python3' >> .env
 - `GC_API_URL` — canonical GC API (기본: `https://gc-v2-api.appback.app/api/v1`)
 - `GC_WS_URL` — WebSocket URL (기본: `https://gc-v2-api.appback.app`)
 - `GC_API_TOKEN` — 한 릴리스 동안만 제공하는 deprecated alias이며 AI Rewards JWT만 허용
-- `GAME_DISCOVERY_INTERVAL_SEC` — 게임 탐색 주기 (기본: `30`)
+- `GAME_DISCOVERY_INTERVAL_SEC` — 대기열 밖에서 게임 참가 가능 여부를 확인하는 주기 (기본: `60`)
+- `GC_QUEUE_POLL_INTERVAL_SEC` — 대기열 진입 후 서버 배정 상태를 확인하는 주기 (기본: `30`)
+
+대기열에 들어간 뒤에는 클라이언트 timeout을 적용하거나 재신청하지 않습니다. 서버가 배정하거나
+대기열에서 제거할 때까지 최초 `queued_at`을 유지하므로 기다린 순서가 보존됩니다.
 - `AUTO_TRAIN_AFTER_GAMES` — 자동 훈련 트리거 게임 수 (기본: `50`)
 - `MODEL_DIR` — ONNX 모델 디렉토리 (기본: `./models`)
 - `DATA_DIR` — SQLite DB 디렉토리 (기본: `./data`)

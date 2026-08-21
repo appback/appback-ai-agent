@@ -58,7 +58,7 @@ pm2 logs ai-agent --lines 25 --nostream
 
 정상 로그:
 ```
-[main] appback-ai-agent v2.5.2 starting...
+[main] appback-ai-agent v2.5.3 starting...
 [main] Operation contract: gc-v8-strategy-r2 / feature v8.1 (214 dims)
 [gc-adapter] GC contract: protocol=1, enforcement=observe, feature=8.1, ...
 [gc-adapter] Canonical agent active: agent-name (uuid)
@@ -69,6 +69,9 @@ pm2 logs ai-agent --lines 25 --nostream
 ```
 
 AI Rewards, 로컬 SQLite와 GC의 UUID가 같은 경우에만 매칭 큐에 진입한다.
+기본적으로 대기열 밖에서는 60초마다 참가 가능 여부를 확인하고, 대기열 안에서는 30초마다
+배정 상태만 확인한다. 대기열에 있는 동안 timeout이나 재신청을 하지 않아 서버의 최초
+`queued_at` 순서를 유지한다.
 
 ---
 

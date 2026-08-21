@@ -83,7 +83,7 @@ async function main() {
   metrics.load('claw-clash')
 
   const config = {
-    discoveryIntervalSec: parseInt(process.env.GAME_DISCOVERY_INTERVAL_SEC || '30'),
+    discoveryIntervalSec: parseInt(process.env.GAME_DISCOVERY_INTERVAL_SEC || '60'),
   }
 
   const manager = new AgentManager(config)

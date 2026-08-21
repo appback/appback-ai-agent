@@ -13,7 +13,8 @@ module.exports = {
     : process.env.GC_API_TOKEN
       ? 'GC_API_TOKEN'
       : null,
-  discoveryIntervalSec: parseInt(process.env.GAME_DISCOVERY_INTERVAL_SEC || '30'),
+  discoveryIntervalSec: parseInt(process.env.GAME_DISCOVERY_INTERVAL_SEC || '60'),
+  queuePollIntervalSec: parseInt(process.env.GC_QUEUE_POLL_INTERVAL_SEC || '30'),
 
   // Strategy timing
   strategyCooldownTicks: 10,

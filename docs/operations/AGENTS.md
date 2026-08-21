@@ -1,6 +1,6 @@
 # AI Agent 운영 인벤토리
 
-> 기준: 2026-08-21, `appback-ai-agent@2.5.2`
+> 기준: 2026-08-21, `appback-ai-agent@2.5.3`
 
 현재 관리 대상은 내부망 두 호스트의 무학습 runtime 20개다. 과거 `.20`, `.21`,
 `.26`, `.30`, EC2 목록은 현재 20개 배포 기준이 아니므로 제거했다.
@@ -36,7 +36,7 @@
 
 - SSH: `ssh storage-40 '<remote command>'`
 - Node: `v22.23.2`
-- 패키지: global `appback-ai-agent@2.5.2`
+- 패키지: global `appback-ai-agent@2.5.3`
 - 인스턴스: `/home/appback/ai-agents/agent-01` ~ `agent-10`
 - 백업: `/home/appback/ai-agent-backups/pre-2.5.1*`
 - 기존 등록 6개 복원 전 백업: `/home/appback/ai-agent-backups/pre-existing-six-restore.QjLxT7`
@@ -45,7 +45,7 @@
 
 - SSH: `ssh storage-50 '<remote command>'`
 - Node: `v18.20.8`
-- 패키지: `/home/daone/ai-agent-runtime`, `appback-ai-agent@2.5.2`
+- 패키지: `/home/daone/ai-agent-runtime`, `appback-ai-agent@2.5.3`
 - RHEL 8 호환 override: `better-sqlite3@7.6.2`
 - 인스턴스: `/home/daone/ai-agents/agent-01` ~ `agent-10`
 - 백업: `/home/daone/ai-agent-backups/pre-2.5.1`
@@ -73,6 +73,8 @@ GC_API_URL=https://gc-v2-api.appback.app/api/v1
 GC_WS_URL=https://gc-v2-api.appback.app
 GC_TRAINING_SYNC_ENABLED=false
 GC_V81_AUTO_TRAIN_ENABLED=false
+GAME_DISCOVERY_INTERVAL_SEC=60
+GC_QUEUE_POLL_INTERVAL_SEC=30
 ```
 
 로컬 자동학습, 학습 후보 업로드, authoritative training feed 동기화를 하지 않는다.
@@ -97,7 +99,7 @@ identity 디렉터리는 위 백업 경로에 보존했다.
 
 ## 2026-08-21 배포 검증
 
-- npm `2.5.2`, Git tag `v2.5.2`
+- npm `2.5.3`, Git tag `v2.5.3`
 - 두 호스트 PM2 `online` 20/20
 - 최종 배치 UUID 확인 20/20
 - AI Rewards 계정의 기존 등록 에이전트가 storage-40에 포함됨 10/10
@@ -107,3 +109,5 @@ identity 디렉터리는 위 백업 경로에 보존했다.
 - 기존 커스텀 Face 연결 5/5, 기존 active V8 모델 연결 5/5
 - 무학습 설정 20/20
 - legacy `GC_API_TOKEN` 운영 `.env` 잔존 0건
+- 서버 대기열에 있는 동안 client timeout·재신청 없음, 최초 `queued_at` FIFO 유지
+- 유휴 참가 확인 60초, 대기열 배정 확인 30초 20/20

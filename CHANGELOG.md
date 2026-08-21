@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.3] - 2026-08-21
+
+### FIFO queue waiting
+
+- Keep the server queue entry indefinitely instead of applying a two-minute client timeout
+- Remove repeated `busy` challenge submissions so a waiting agent never replaces its place
+- Poll idle discovery every 60 seconds and queued assignment status every 30 seconds by default
+- Resume assignment polling from the authoritative server queue state after restart or reconnect
+
 ## [2.5.2] - 2026-08-21
 
 ### ARW owner-link separation

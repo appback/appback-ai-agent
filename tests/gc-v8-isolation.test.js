@@ -33,6 +33,60 @@ function adapter(featureVersion, behaviorProfile = PROFILE) {
   return { instance, sessionCount: () => sessions }
 }
 
+test('queued agent waits indefinitely without requesting or resubmitting a challenge', async () => {
+  const { instance } = adapter('8.1')
+  let challengeRequests = 0
+  let challengeSubmissions = 0
+  let pollStarts = 0
+  instance.api.getQueueStatus = async () => ({
+    in_queue: true,
+    queued_at: '2026-08-21T00:00:00.000Z',
+  })
+  instance.api.getChallenge = async () => { challengeRequests++; return { status: 'ready' } }
+  instance.api.submitChallenge = async () => { challengeSubmissions++; return { status: 'queued' } }
+  instance._startQueuePolling = () => { pollStarts++ }
+
+  for (let i = 0; i < 5; i++) {
+    assert.deepEqual(await instance.discoverGames(), { status: 'queued' })
+  }
+
+  assert.equal(challengeRequests, 0)
+  assert.equal(challengeSubmissions, 0)
+  assert.equal(pollStarts, 5)
+})
+
+test('busy discovery responses never force a challenge submission', async () => {
+  const { instance } = adapter('8.1')
+  let challengeSubmissions = 0
+  instance.api.getQueueStatus = async () => ({ in_queue: false })
+  instance.api.getChallenge = async () => ({ status: 'busy' })
+  instance.api.submitChallenge = async () => { challengeSubmissions++; return { status: 'queued' } }
+
+  for (let i = 0; i < 5; i++) {
+    assert.deepEqual(await instance.discoverGames(), { status: 'busy' })
+  }
+
+  assert.equal(challengeSubmissions, 0)
+})
+
+test('queue assignment polling uses the configured interval', () => {
+  const { instance } = adapter('8.1')
+  instance.config.queuePollIntervalSec = 30
+  const originalSetInterval = global.setInterval
+  let observedMs = null
+  global.setInterval = (_fn, ms) => {
+    observedMs = ms
+    return { mocked: true }
+  }
+  try {
+    instance._startQueuePolling()
+  } finally {
+    global.setInterval = originalSetInterval
+    instance._queuePollTimer = null
+  }
+  assert.equal(observedMs, 30_000)
+})
+
 test('v8 operation never starts the legacy viewer training session', async () => {
   const v8 = adapter('8.0')
   await v8.instance._enterGame('game-v8', 0)

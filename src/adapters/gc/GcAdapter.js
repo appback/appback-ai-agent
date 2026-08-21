@@ -67,9 +67,7 @@ class GcAdapter extends BaseGameAdapter {
     this.sessionId = null
     this._strategyLog = []
     this._terrainCached = false
-    this._queuedSince = null
     this._reconnecting = false
-    this._busyCount = 0
     this.authState = AUTH_STATES.UNBOUND
   }
 
@@ -246,9 +244,9 @@ class GcAdapter extends BaseGameAdapter {
     this._reconnecting = true
     log.info('Reconnected — resetting state for recovery')
 
-    // Always stop stale queue polling — queue was likely cleared on server restart
+    // Stop the local poller. The next discovery tick asks the server for the
+    // authoritative queue state and resumes polling without replacing the row.
     this._stopQueuePolling()
-    this._queuedSince = null
 
     if (!this.activeGameId) {
       log.info('No active game — will re-queue on next discovery tick')
@@ -330,29 +328,16 @@ class GcAdapter extends BaseGameAdapter {
       const queueStatus = await this.api.getQueueStatus().catch(() => null)
       if (queueStatus?.active_game_id) {
         log.info(`Found active game from queue: ${queueStatus.active_game_id}`)
-        this._queuedSince = null
         await this._enterGame(queueStatus.active_game_id)
         return { status: 'joined', gameId: queueStatus.active_game_id }
       }
 
-      // If still in queue, check for timeout (2 minutes max)
+      // A server queue row is authoritative. Never expire or replace it from
+      // the client: queued_at determines FIFO order and must remain stable.
       if (queueStatus?.in_queue) {
-        if (!this._queuedSince) {
-          this._queuedSince = Date.now()
-        }
-        const waitMs = Date.now() - this._queuedSince
-        const waitSec = Math.round(waitMs / 1000)
-
-        if (waitMs > 120_000) {
-          log.info(`Queue timeout after ${waitSec}s — leaving queue and re-joining`)
-          this._queuedSince = null
-          // Force re-join by falling through to getChallenge
-        } else {
-          log.info(`In matchmaking queue (${waitSec}s), waiting...`)
-          return { status: 'queued' }
-        }
-      } else {
-        this._queuedSince = null
+        this._startQueuePolling()
+        log.info('In matchmaking queue, waiting for server assignment...')
+        return { status: 'queued' }
       }
 
       // Not in queue, not in game — try to join
@@ -360,19 +345,9 @@ class GcAdapter extends BaseGameAdapter {
       log.info(`Challenge response: ${JSON.stringify(challenge)}`)
 
       if (challenge.status === 'busy') {
-        this._busyCount++
-
-        // Server thinks we're in a game but we have no activeGameId
-        // After 3 consecutive busy responses (90s), try to force re-join
-        if (this._busyCount >= 3 && !this.activeGameId) {
-          log.info(`Busy ${this._busyCount} times with no active game — force submitting challenge`)
-          this._busyCount = 0
-          return await this.joinGame()
-        }
         return { status: 'busy' }
       }
 
-      this._busyCount = 0
       if (challenge.status === 'ready') return await this.joinGame()
       return { status: challenge.status }
     } catch (err) {
@@ -400,7 +375,6 @@ class GcAdapter extends BaseGameAdapter {
 
       if (result.status === 'queued') {
         log.info('Queued for matchmaking, will poll for assignment')
-        this._queuedSince = Date.now()
         this._startQueuePolling()
         return { status: 'queued' }
       }
@@ -449,8 +423,9 @@ class GcAdapter extends BaseGameAdapter {
 
   _startQueuePolling() {
     if (this._queuePollTimer) return
-    log.info('Starting queue poll (every 5s)')
-    this._queuePollTimer = setInterval(() => this._pollQueue(), 5000)
+    const intervalSec = Math.max(5, Number(this.config.queuePollIntervalSec) || 30)
+    log.info(`Starting queue poll (every ${intervalSec}s)`)
+    this._queuePollTimer = setInterval(() => this._pollQueue(), intervalSec * 1000)
   }
 
   _stopQueuePolling() {
@@ -747,7 +722,6 @@ class GcAdapter extends BaseGameAdapter {
     this.sessionId = null
     this._strategyLog = []
     this._terrainCached = false
-    this._queuedSince = null
     this.strategyEngine.reset()
     this.featureBuilder.clearTerrain()
 
@@ -804,7 +778,6 @@ class GcAdapter extends BaseGameAdapter {
     this.sessionId = null
     this._strategyLog = []
     this._terrainCached = false
-    this._queuedSince = null
     this.strategyEngine.reset()
     this.featureBuilder.clearTerrain()
 

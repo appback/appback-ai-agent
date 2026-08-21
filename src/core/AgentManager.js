@@ -28,7 +28,7 @@ class AgentManager {
         log.info(`Initialized adapter: ${name}`)
 
         const intervalSec = adapter.config.discoveryIntervalSec ||
-          this.config.discoveryIntervalSec || 30
+          this.config.discoveryIntervalSec || 60
         const scheduler = new Scheduler(intervalSec)
 
         scheduler.start(async () => {
