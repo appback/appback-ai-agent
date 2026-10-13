@@ -166,7 +166,19 @@ class GcAdapter extends BaseGameAdapter {
         code === 'INVALID_AI_REWARDS_AGENT'
       ) {
         this.authState = AUTH_STATES.REAUTH_REQUIRED
-        throw new Error(`${code || 'INVALID_AI_REWARDS_AGENT'}: automatic AI Rewards JWT renewal failed`)
+        log.warn(`${code || 'INVALID_AI_REWARDS_AGENT'}: requesting a replacement AI Rewards JWT`)
+        try {
+          await this._issueCanonicalIdentity(store, saved)
+        } catch (renewalError) {
+          // Keep the manager alive so its scheduler can retry with bounded
+          // backoff instead of letting PM2 enter a tight restart loop.
+          const delayMs = this._scheduleReauthRetry()
+          log.error(
+            `Startup credential renewal failed: ${renewalError.message}; ` +
+            `retrying in ${Math.round(delayMs / 1000)}s`
+          )
+        }
+        return
       } else {
         throw new Error(`GC agent authentication check failed: ${error.message}`)
       }

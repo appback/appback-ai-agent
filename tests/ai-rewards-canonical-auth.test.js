@@ -412,6 +412,61 @@ test('runtime auth issue failure returns to REAUTH_REQUIRED instead of staying I
   assert.equal(adapter.authState, GcAdapter.AUTH_STATES.REAUTH_REQUIRED)
 })
 
+test('startup replaces a structurally valid JWT rejected by GC', async () => {
+  const saved = { agent_id: AGENT_ID, api_token: makeJwt(), name: 'canonical-agent' }
+  let issueAttempts = 0
+  const adapter = adapterWith({
+    saved,
+    authClient: {
+      issue: async ({ agentId }) => {
+        issueAttempts++
+        return {
+          service: 'gc', agentId, agentName: saved.name,
+          agentToken: makeJwt(agentId), expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        }
+      },
+    },
+  })
+  adapter.api = {
+    setToken() {},
+    getAgentMe: async () => {
+      const error = new Error('revoked')
+      error.response = { status: 401, data: { code: 'INVALID_AI_REWARDS_AGENT' } }
+      throw error
+    },
+    register: async () => ({
+      agent_id: AGENT_ID, name: saved.name, identity_source: 'ai_rewards_jwt',
+    }),
+  }
+
+  await adapter._initializeCanonicalIdentity()
+  assert.equal(issueAttempts, 1)
+  assert.equal(adapter.authState, GcAdapter.AUTH_STATES.ACTIVE)
+  assert.equal(adapter.agentId, AGENT_ID)
+})
+
+test('startup renewal outage stays alive for bounded scheduler retries', async () => {
+  const saved = { agent_id: AGENT_ID, api_token: makeJwt(), name: 'canonical-agent' }
+  const adapter = adapterWith({
+    saved,
+    authClient: { issue: async () => { throw new Error('temporary rewards outage') } },
+  })
+  adapter.config.authRetryBaseSec = 60
+  adapter.api = {
+    setToken() {},
+    getAgentMe: async () => {
+      const error = new Error('revoked')
+      error.response = { status: 401, data: { code: 'INVALID_AI_REWARDS_AGENT' } }
+      throw error
+    },
+  }
+
+  await adapter._initializeCanonicalIdentity()
+  assert.equal(adapter.authState, GcAdapter.AUTH_STATES.REAUTH_REQUIRED)
+  assert.equal(adapter._reauthFailureCount, 1)
+  assert.ok(adapter._nextReauthAt > Date.now())
+})
+
 test('runtime retries failed reauthentication with bounded backoff and recovers', async () => {
   const saved = { agent_id: AGENT_ID, api_token: makeJwt(), name: 'canonical-agent' }
   let attempts = 0

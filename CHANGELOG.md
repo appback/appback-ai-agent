@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.5] - 2026-10-13
+
+### Startup authentication recovery
+
+- Replace an unexpired JWT when GC has revoked it instead of entering a PM2 restart loop
+- Keep the agent manager alive when startup renewal is temporarily unavailable
+- Reuse bounded scheduler backoff for deferred startup credential renewal
+
 ## [2.5.4] - 2026-10-13
 
 ### Authentication recovery

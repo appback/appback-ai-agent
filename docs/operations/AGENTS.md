@@ -1,6 +1,6 @@
 # AI Agent 운영 인벤토리
 
-> 기준: 2026-10-13, `appback-ai-agent@2.5.4`
+> 기준: 2026-10-13, `appback-ai-agent@2.5.5`
 
 현재 관리 대상은 내부망 두 호스트의 무학습 runtime 20개다. 과거 `.20`, `.21`,
 `.26`, `.30`, EC2 목록은 현재 20개 배포 기준이 아니므로 제거했다.
@@ -36,7 +36,7 @@
 
 - SSH: `ssh storage-40 '<remote command>'`
 - Node: `v22.23.2`
-- 패키지: global `appback-ai-agent@2.5.4`
+- 패키지: global `appback-ai-agent@2.5.5`
 - 인스턴스: `/home/appback/ai-agents/agent-01` ~ `agent-10`
 - 백업: `/home/appback/ai-agent-backups/pre-2.5.1*`
 - 기존 등록 6개 복원 전 백업: `/home/appback/ai-agent-backups/pre-existing-six-restore.QjLxT7`
@@ -45,7 +45,7 @@
 
 - SSH: `ssh storage-50 '<remote command>'`
 - Node: `v18.20.8`
-- 패키지: `/home/daone/ai-agent-runtime`, `appback-ai-agent@2.5.4`
+- 패키지: `/home/daone/ai-agent-runtime`, `appback-ai-agent@2.5.5`
 - RHEL 8 호환 override: `better-sqlite3@7.6.2`
 - 인스턴스: `/home/daone/ai-agents/agent-01` ~ `agent-10`
 - 백업: `/home/daone/ai-agent-backups/pre-2.5.1`
@@ -101,7 +101,7 @@ identity 디렉터리는 위 백업 경로에 보존했다.
 
 ## 2026-10-13 배포 검증
 
-- npm `2.5.4`, Git tag `v2.5.4`
+- 배포 패키지 `2.5.5`, Git tag `v2.5.5` (npm 공개 레지스트리는 인증 복구 후 반영)
 - 두 호스트 PM2 `online` 20/20
 - 최종 배치 UUID 확인 20/20
 - AI Rewards 계정의 기존 등록 에이전트가 storage-40에 포함됨 10/10
