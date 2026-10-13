@@ -400,6 +400,64 @@ function adapterWith(options = {}) {
   return adapter
 }
 
+test('runtime auth issue failure returns to REAUTH_REQUIRED instead of staying ISSUING', async () => {
+  const saved = { agent_id: AGENT_ID, api_token: makeJwt(), name: 'canonical-agent' }
+  const adapter = adapterWith({
+    saved,
+    authClient: { issue: async () => { throw new Error('temporary rewards outage') } },
+  })
+  adapter.authState = GcAdapter.AUTH_STATES.REAUTH_REQUIRED
+
+  await assert.rejects(adapter._issueCanonicalIdentity(), /temporary rewards outage/)
+  assert.equal(adapter.authState, GcAdapter.AUTH_STATES.REAUTH_REQUIRED)
+})
+
+test('runtime retries failed reauthentication with bounded backoff and recovers', async () => {
+  const saved = { agent_id: AGENT_ID, api_token: makeJwt(), name: 'canonical-agent' }
+  let attempts = 0
+  const adapter = adapterWith({
+    saved,
+    authClient: {
+      issue: async () => {
+        attempts++
+        if (attempts === 1) throw new Error('temporary rewards outage')
+        return {
+          service: 'gc', agentId: AGENT_ID, agentName: saved.name,
+          agentToken: makeJwt(), expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        }
+      },
+    },
+  })
+  adapter.config.authRetryBaseSec = 60
+  adapter.config.authRetryMaxSec = 900
+  adapter.api = {
+    setToken() {},
+    register: async () => ({
+      agent_id: AGENT_ID, name: saved.name, identity_source: 'ai_rewards_jwt',
+    }),
+    getQueueStatus: async () => ({ in_queue: true }),
+  }
+  adapter._startQueuePolling = () => {}
+  adapter.authState = GcAdapter.AUTH_STATES.REAUTH_REQUIRED
+
+  const failed = await adapter.discoverGames()
+  assert.equal(failed.status, 'reauth_required')
+  assert.equal(adapter.authState, GcAdapter.AUTH_STATES.REAUTH_REQUIRED)
+  assert.equal(attempts, 1)
+  assert.ok(failed.retryAt > Date.now())
+
+  const backedOff = await adapter.discoverGames()
+  assert.equal(backedOff.status, 'reauth_backoff')
+  assert.equal(attempts, 1)
+
+  adapter._nextReauthAt = 0
+  assert.deepEqual(await adapter.discoverGames(), { status: 'queued' })
+  assert.equal(attempts, 2)
+  assert.equal(adapter.authState, GcAdapter.AUTH_STATES.ACTIVE)
+  assert.equal(adapter._reauthFailureCount, 0)
+  assert.equal(adapter._nextReauthAt, 0)
+})
+
 test('runtime obtains a UUID when absent and preserves a legacy local UUID', async () => {
   const missing = adapterWith()
   missing.api = {

@@ -15,6 +15,8 @@ module.exports = {
       : null,
   discoveryIntervalSec: parseInt(process.env.GAME_DISCOVERY_INTERVAL_SEC || '60'),
   queuePollIntervalSec: parseInt(process.env.GC_QUEUE_POLL_INTERVAL_SEC || '30'),
+  authRetryBaseSec: parseInt(process.env.GC_AUTH_RETRY_BASE_SEC || '60'),
+  authRetryMaxSec: parseInt(process.env.GC_AUTH_RETRY_MAX_SEC || '900'),
 
   // Strategy timing
   strategyCooldownTicks: 10,

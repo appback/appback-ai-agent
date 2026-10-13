@@ -5,8 +5,8 @@ x-agent-common: &agent-common
     context: .
     dockerfile: Dockerfile.runtime
     args:
-      APPBACK_AI_AGENT_VERSION: ${APPBACK_AI_AGENT_VERSION:-2.5.3}
-  image: appback-ai-agent:${APPBACK_AI_AGENT_VERSION:-2.5.3}-runtime
+      APPBACK_AI_AGENT_VERSION: ${APPBACK_AI_AGENT_VERSION:-2.5.4}
+  image: appback-ai-agent:${APPBACK_AI_AGENT_VERSION:-2.5.4}-runtime
   restart: unless-stopped
   environment: &agent-environment
     AI_REWARDS_API_URL: ${AI_REWARDS_API_URL:-https://appback.app/api/v1}
@@ -14,6 +14,8 @@ x-agent-common: &agent-common
     GC_WS_URL: ${GC_WS_URL:-https://gc-v2-api.appback.app}
     GAME_DISCOVERY_INTERVAL_SEC: ${GAME_DISCOVERY_INTERVAL_SEC:-60}
     GC_QUEUE_POLL_INTERVAL_SEC: ${GC_QUEUE_POLL_INTERVAL_SEC:-30}
+    GC_AUTH_RETRY_BASE_SEC: ${GC_AUTH_RETRY_BASE_SEC:-60}
+    GC_AUTH_RETRY_MAX_SEC: ${GC_AUTH_RETRY_MAX_SEC:-900}
     MAX_CONCURRENT_GAMES: ${MAX_CONCURRENT_GAMES:-1}
     GC_TRAINING_SYNC_ENABLED: "false"
     GC_TRAINING_SYNC_INTERVAL_SEC: ${GC_TRAINING_SYNC_INTERVAL_SEC:-30}

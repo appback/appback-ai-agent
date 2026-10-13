@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.4] - 2026-10-13
+
+### Authentication recovery
+
+- Restore `REAUTH_REQUIRED` whenever AI Rewards or GC credential renewal fails
+- Retry runtime credential renewal with exponential backoff from 60 seconds to 15 minutes
+- Clear the retry state after successful UUID-preserving JWT renewal
+- Prevent a transient GC 401 followed by an AI Rewards outage from silently stopping discovery forever
+
 ## [2.5.3] - 2026-08-21
 
 ### FIFO queue waiting

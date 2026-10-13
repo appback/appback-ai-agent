@@ -47,6 +47,8 @@ class GcAdapter extends BaseGameAdapter {
     })
     this.api.onAuthFailure(code => {
       this.authState = AUTH_STATES.REAUTH_REQUIRED
+      this._reauthFailureCount = 0
+      this._nextReauthAt = 0
       this._stopQueuePolling()
       log.error(`${code}: AI Rewards credential reissue required`)
     })
@@ -68,6 +70,8 @@ class GcAdapter extends BaseGameAdapter {
     this._strategyLog = []
     this._terrainCached = false
     this._reconnecting = false
+    this._reauthFailureCount = 0
+    this._nextReauthAt = 0
     this.authState = AUTH_STATES.UNBOUND
   }
 
@@ -199,17 +203,35 @@ class GcAdapter extends BaseGameAdapter {
     if (!store) throw new Error('AI Rewards identity storage is unavailable')
     const localIdentity = saved || store.getIdentity(this.gameName) || null
     this.authState = AUTH_STATES.ISSUING
-    const issued = await issueCanonicalAgent({
-      agentName: localIdentity?.name || this.config.agentName || 'appback-ai-agent',
-      authClient: this.authClient,
-      gcClient: this.api,
-      store,
-      game: this.gameName,
-    })
-    this.apiToken = issued.agentToken
-    this.agentId = issued.agentId
-    this.authState = AUTH_STATES.ACTIVE
-    log.info(`Canonical agent active: ${issued.agentName || 'unnamed'} (${issued.agentId})`)
+    try {
+      const issued = await issueCanonicalAgent({
+        agentName: localIdentity?.name || this.config.agentName || 'appback-ai-agent',
+        authClient: this.authClient,
+        gcClient: this.api,
+        store,
+        game: this.gameName,
+      })
+      this.apiToken = issued.agentToken
+      this.agentId = issued.agentId
+      this.authState = AUTH_STATES.ACTIVE
+      this._reauthFailureCount = 0
+      this._nextReauthAt = 0
+      log.info(`Canonical agent active: ${issued.agentName || 'unnamed'} (${issued.agentId})`)
+    } catch (error) {
+      // A transient AI Rewards or GC failure must remain retryable. Leaving the
+      // state as ISSUING permanently suppresses all later discovery ticks.
+      this.authState = AUTH_STATES.REAUTH_REQUIRED
+      throw error
+    }
+  }
+
+  _scheduleReauthRetry() {
+    this._reauthFailureCount += 1
+    const baseMs = Math.max(5, Number(this.config.authRetryBaseSec) || 60) * 1000
+    const maxMs = Math.max(baseMs, Number(this.config.authRetryMaxSec) || 900) * 1000
+    const delayMs = Math.min(maxMs, baseMs * (2 ** Math.min(this._reauthFailureCount - 1, 10)))
+    this._nextReauthAt = Date.now() + delayMs
+    return delayMs
   }
 
   async _checkServerContract() {
@@ -289,11 +311,18 @@ class GcAdapter extends BaseGameAdapter {
 
   async discoverGames() {
     if (this.authState === AUTH_STATES.REAUTH_REQUIRED) {
+      if (Date.now() < this._nextReauthAt) {
+        return { status: 'reauth_backoff', retryAt: this._nextReauthAt }
+      }
       try {
         await this._issueCanonicalIdentity()
       } catch (error) {
-        log.error(`AI Rewards credential reissue failed: ${error.message}`)
-        return { status: 'reauth_required' }
+        const delayMs = this._scheduleReauthRetry()
+        log.error(
+          `AI Rewards credential reissue failed: ${error.message}; ` +
+          `retrying in ${Math.round(delayMs / 1000)}s`
+        )
+        return { status: 'reauth_required', retryAt: this._nextReauthAt }
       }
     }
     if (this.authState !== AUTH_STATES.ACTIVE) {
