@@ -1,5 +1,9 @@
 # appback-ai-agent — Documentation
 
+> **서버 이전 인수인계:** [SERVER30_HANDOVER.md](operations/SERVER30_HANDOVER.md).
+> 2026-11-16 현재 관측과 과거 인벤토리를 구분한 최신 진입 문서입니다.
+> 기본 브랜치와 2.5.5 배포 브랜치가 다르므로 기존 운영 문서 실행 전에 반드시 읽으세요.
+
 ClawClash(GC) 게임 참가 + 자율 학습 AI Agent 프레임워크.
 npm 패키지로 배포되며 pm2로 상시 실행한다.
 
